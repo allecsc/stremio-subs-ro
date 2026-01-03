@@ -75,23 +75,39 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
       const subsRo = getClient(config.apiKey);
       const results = await subsRo.searchByImdb(imdbId);
 
-      // Filter by language
+      // Filter by language (if configured)
       let filtered = results;
-      if (config.languages && config.languages.length > 0) {
-        filtered = results.filter((sub) =>
-          config.languages.includes(sub.language)
-        );
+      const languages = Array.isArray(config.languages)
+        ? config.languages
+        : config.languages
+        ? [config.languages]
+        : [];
+
+      if (languages.length > 0) {
+        filtered = results.filter((sub) => languages.includes(sub.language));
       }
 
-      // Filter by episode for series
+      // Process results based on type
       if (isSeries) {
-        filtered = filtered.filter((sub) => {
-          // Check both description and title for episode match
+        const strictMatches = filtered.filter((sub) => {
           const searchText = `${sub.description || ""} ${sub.title || ""}`;
           return matchesEpisode(searchText, season, episode);
         });
+
+        if (strictMatches.length > 0) {
+          console.log(
+            `[SUBS] Series ${imdbId} S${season}E${episode}: Found ${strictMatches.length} matching subs`
+          );
+          filtered = strictMatches;
+        } else if (filtered.length > 0) {
+          console.log(
+            `[SUBS] Series ${imdbId} S${season}E${episode}: No strict matches, serving all ${filtered.length} subs for this title as fallback`
+          );
+          // Keep all subs for this title as fallback
+        }
+      } else {
         console.log(
-          `[SUBS] Series ${imdbId} S${season}E${episode}: ${results.length} -> ${filtered.length} after episode filter`
+          `[SUBS] Movie ${imdbId}: Serving all ${filtered.length} subs for selected languages`
         );
       }
 
@@ -119,6 +135,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         id: `subsro_${sub.id}`,
         url: `${baseUrl}/${config.apiKey}/proxy/${sub.id}/${encodedFilename}/sub.vtt`,
         lang: LANGUAGE_MAPPING[sub.language] || sub.language,
+        name: sub.title || sub.description || "Subtitle",
       }));
 
       // Store in Cache
@@ -128,11 +145,6 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         ttl: subtitles.length > 0 ? CACHE_TTL : EMPTY_CACHE_TTL,
       });
 
-      console.log(
-        `[SUBS] Served ${subtitles.length} subs for ${imdbId}${
-          isSeries ? ` S${season}E${episode}` : ""
-        } (Cache: MISS)`
-      );
       return { subtitles };
     } catch (error) {
       console.error(`[SUBS] Error for ${imdbId}:`, error.message);
