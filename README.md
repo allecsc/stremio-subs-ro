@@ -35,7 +35,7 @@ cd stremio-subs-ro && npm install && npm start
 
 ## ☕ Susține
 
-Dacă ți se pare util acest addon, poți să-mi [oferi o cafea](https://buymeacoffee.com/allecsc)!
+Dacă ți se pare util acest addon, poți să-mi [oferi o cafea](https://ko-fi.com/allecsc)!
 
 ## 📄 Licență
 
@@ -72,7 +72,7 @@ cd stremio-subs-ro && npm install && npm start
 
 ## ☕ Support
 
-If you find this addon useful, you can [buy me a coffee](https://buymeacoffee.com/allecsc)!
+If you find this addon useful, you can [buy me a coffee](https://ko-fi.com/allecsc)!
 
 ## 📄 License
 
