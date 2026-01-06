@@ -4,6 +4,9 @@
 
 **[English](#english)** | **[Română](#română)**
 
+<img height="709" alt="image" src="https://github.com/user-attachments/assets/9d3b1605-c661-4237-b5e5-aa447a783767" />
+
+
 ---
 
 <a name="română"></a>
