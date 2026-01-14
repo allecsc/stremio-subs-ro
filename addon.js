@@ -1,6 +1,11 @@
 const { addonBuilder } = require("stremio-addon-sdk");
 const SubsRoClient = require("./lib/subsro");
-const { matchesEpisode, calculateMatchScore } = require("./lib/matcher");
+const {
+  matchesEpisode,
+  calculateMatchScore,
+  getQualityTags,
+  getReleaseGroup,
+} = require("./lib/matcher");
 const { listSrtFiles, getArchiveType } = require("./lib/archiveUtils");
 const { getLimiter } = require("./lib/rateLimiter");
 const manifest = require("./manifest");
@@ -119,6 +124,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
     try {
       const subsRo = getClient(config.apiKey);
       const results = await subsRo.searchByImdb(imdbId);
+      console.log(`[SUBS] Search results for ${imdbId}:`, results);
 
       // Filter by language
       let filteredResults = results;
@@ -133,7 +139,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         "https://cdcd7719a6b3-stremio-subs-ro.baby-beamup.club";
       const baseUrl = process.env.NODE_ENV
         ? BEAMUP_URL
-        : config.baseUrl || "http://localhost:7000";
+        : config.baseUrl || `http://localhost:${process.env.PORT || 7000}`;
 
       const allSubtitles = [];
 
@@ -141,6 +147,19 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
       for (const sub of filteredResults) {
         const srtFiles = await getArchiveSrtList(config.apiKey, sub.id);
         const lang = LANGUAGE_MAPPING[sub.language] || sub.language;
+
+        // Check if any SRT file lacks release group/format info
+        // Only fetch metadata if needed (saves HTTP requests)
+        const needsMetadata = srtFiles.some((srtPath) => {
+          const group = getReleaseGroup(srtPath);
+          const tags = getQualityTags(srtPath);
+          return !group || tags.length === 0;
+        });
+
+        // Fetch page metadata only if SRT files lack release info
+        const metadata = needsMetadata
+          ? await subsRo.getSubtitleMetadata(sub.link)
+          : null;
 
         for (const srtPath of srtFiles) {
           // For series: filter out SRTs that don't match the episode
@@ -152,8 +171,13 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
 
           const encodedSrtPath = Buffer.from(srtPath).toString("base64url");
 
-          // Calculate weighted match score (release group +50, source +20, base fuzzy)
-          const matchScore = calculateMatchScore(videoFilename, srtPath);
+          // Calculate weighted match score (release group +50, source +30, tech +5, fuzzy)
+          // Pass metadata only if it was fetched
+          const matchScore = calculateMatchScore(
+            videoFilename,
+            srtPath,
+            metadata
+          );
 
           allSubtitles.push({
             id: `subsro_${sub.id}_${encodedSrtPath.slice(0, 8)}`,
@@ -161,6 +185,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
             lang,
             srtPath,
             matchScore,
+            metadata, // Store for potential future use
           });
         }
       }
@@ -173,12 +198,21 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         const top = allSubtitles.slice(0, 5); // Show top 5
         console.log(`[SUBS] Matching results for "${videoFilename}":`);
         top.forEach((s, i) => {
-          console.log(`  ${i + 1}. [Score: ${s.matchScore}] ${s.srtPath}`);
+          const fps = s.metadata?.fps || "-";
+          const formats =
+            s.metadata?.formats?.length > 0
+              ? s.metadata.formats.join("/")
+              : "-";
+          console.log(
+            `  ${i + 1}. [Score: ${
+              s.matchScore
+            }] [FPS: ${fps}] [Formats: ${formats}] ${s.srtPath}`
+          );
         });
       }
 
-      // Remove internal properties before returning
-      const subtitles = allSubtitles.map(({ id, url, lang }) => ({
+      // Return only top 5 matches, remove internal properties
+      const subtitles = allSubtitles.slice(0, 5).map(({ id, url, lang }) => ({
         id,
         url,
         lang,
