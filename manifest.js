@@ -1,6 +1,6 @@
 const manifest = {
   id: "org.stremio.subsro",
-  version: "1.1.0",
+  version: "1.1.1",
   name: "Subs.ro Subtitles",
   description: "Romanian subtitles from Subs.ro (unofficial)",
   logo: "https://raw.githubusercontent.com/allecsc/stremio-subs-ro/refs/heads/master/public/logo.png",
