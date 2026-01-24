@@ -8,18 +8,61 @@ const manifest = require("./manifest");
 const builder = new addonBuilder(manifest);
 
 // --- CACHE SYSTEM ---
+// --- CACHE SYSTEM ---
 const { ARCHIVE_CACHE, ARCHIVE_CACHE_TTL } = require("./lib/archiveCache");
-const CACHE = new Map();
-const PENDING_REQUESTS = new Map();
-const CLIENT_CACHE = new Map();
+
+// Simple LRU implementation to prevent memory leaks
+class SimpleLRU {
+  constructor(maxSize, ttl = 0) {
+    this.maxSize = maxSize;
+    this.ttl = ttl;
+    this.cache = new Map();
+  }
+
+  get(key) {
+    const item = this.cache.get(key);
+    if (!item) return null;
+
+    if (this.ttl > 0 && Date.now() - item.timestamp > this.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    // Refresh LRU order
+    this.cache.delete(key);
+    this.cache.set(key, item);
+    return item.value;
+  }
+
+  set(key, value) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      // Evict oldest (first item in Map iteration order)
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
+    this.cache.set(key, { value, timestamp: Date.now() });
+  }
+
+  has(key) {
+    return this.cache.has(key);
+  }
+}
+
+const CACHE = new SimpleLRU(1000); // Max 1000 subtitle responses
+const PENDING_REQUESTS = new Map(); // Pending requests are transient, no LRU needed
+const CLIENT_CACHE = new SimpleLRU(500); // Max 500 active API clients
 const CACHE_TTL = 15 * 60 * 1000;
 const EMPTY_CACHE_TTL = 60 * 1000;
 
 const getClient = (apiKey) => {
-  if (!CLIENT_CACHE.has(apiKey)) {
-    CLIENT_CACHE.set(apiKey, new SubsRoClient(apiKey));
+  let client = CLIENT_CACHE.get(apiKey);
+  if (!client) {
+    client = new SubsRoClient(apiKey);
+    CLIENT_CACHE.set(apiKey, client);
   }
-  return CLIENT_CACHE.get(apiKey);
+  return client;
 };
 
 const LANGUAGE_MAPPING = {
@@ -109,9 +152,9 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
     : `${imdbId}_${config.languages || "all"}`;
 
   // 1. Check Cache
-  const cached = CACHE.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < cached.ttl) {
-    return { subtitles: cached.data };
+  const cachedData = CACHE.get(cacheKey);
+  if (cachedData && Date.now() - cachedData.timestamp < cachedData.ttl) {
+    return { subtitles: cachedData.data };
   }
 
   // 2. Debounce Pending Requests
