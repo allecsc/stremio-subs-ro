@@ -115,8 +115,6 @@ app.get("/:config?/subtitles/:type/:id/:extra?.json", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  // Visual reset of logs
-  console.log("\x1Bc");
   console.log(`🚀 Addon live on port ${PORT}`);
   console.log(`[INFO] Logs silenced for production.`);
 
