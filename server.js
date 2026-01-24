@@ -18,7 +18,7 @@ app.use(
   helmet({
     contentSecurityPolicy: false, // Disable CSP to allow custom configuration page scripts/styles
     crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
+  }),
 );
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
@@ -39,13 +39,13 @@ const decodeConfig = (configStr) => {
 
 // Serve configure page directly (no redirect - required by addon catalog)
 app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "configure.html"))
+  res.sendFile(path.join(__dirname, "public", "configure.html")),
 );
 app.get("/configure", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "configure.html"))
+  res.sendFile(path.join(__dirname, "public", "configure.html")),
 );
 app.get("/:config/configure", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "configure.html"))
+  res.sendFile(path.join(__dirname, "public", "configure.html")),
 );
 
 // Manifest handler (shared by all manifest routes)
@@ -116,4 +116,14 @@ app.get("/:config?/subtitles/:type/:id/:extra?.json", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Addon live on port ${PORT}`);
+  console.log(`[INFO] Logs silenced for production.`);
+
+  // Scheduled restart every 24 hours to prevent memory leaks/hangs
+  const RESTART_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+  setTimeout(() => {
+    console.error("[SYSTEM] Planned 24h restart triggered. Exiting...");
+    process.exit(0);
+  }, RESTART_INTERVAL);
+
+  console.log(`[SYSTEM] Scheduled restart in 24 hours.`);
 });

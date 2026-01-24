@@ -76,13 +76,17 @@ async function getArchiveSrtList(apiKey, subId) {
 
     const status = limiter.getQueueStatus();
     const ts = new Date().toISOString().slice(11, 23);
-    console.log(
-      `[${ts}] [SUBS] Archive ${subId}: ${
-        srtFiles.length
-      } SRTs (${archiveType.toUpperCase()}) [Active: ${
-        status.activeDownloads
-      }, Pending: ${status.download}]`
-    );
+
+    // Only log in development to prevent disk fill
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `[${ts}] [SUBS] Archive ${subId}: ${
+          srtFiles.length
+        } SRTs (${archiveType.toUpperCase()}) [Active: ${
+          status.activeDownloads
+        }, Pending: ${status.download}]`,
+      );
+    }
 
     return srtFiles;
   } catch (error) {
@@ -124,7 +128,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
       let filteredResults = results;
       if (config.languages && config.languages.length > 0) {
         filteredResults = results.filter((sub) =>
-          config.languages.includes(sub.language)
+          config.languages.includes(sub.language),
         );
       }
 
@@ -168,8 +172,12 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
       // Sort by weighted match score (highest first)
       allSubtitles.sort((a, b) => b.matchScore - a.matchScore);
 
-      // Log top matches for debugging
-      if (allSubtitles.length > 0 && videoFilename) {
+      // Log top matches for debugging (Dev only)
+      if (
+        process.env.NODE_ENV === "development" &&
+        allSubtitles.length > 0 &&
+        videoFilename
+      ) {
         const top = allSubtitles.slice(0, 5); // Show top 5
         console.log(`[SUBS] Matching results for "${videoFilename}":`);
         top.forEach((s, i) => {
@@ -191,11 +199,13 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         ttl: subtitles.length > 0 ? CACHE_TTL : EMPTY_CACHE_TTL,
       });
 
-      console.log(
-        `[SUBS] Served ${subtitles.length} subs for ${imdbId}${
-          isSeries ? ` S${season}E${episode}` : ""
-        } (Status: OK)`
-      );
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `[SUBS] Served ${subtitles.length} subs for ${imdbId}${
+            isSeries ? ` S${season}E${episode}` : ""
+          } (Status: OK)`,
+        );
+      }
 
       return { subtitles };
     } catch (error) {
