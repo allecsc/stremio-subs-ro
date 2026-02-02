@@ -1,6 +1,6 @@
 {
   "name": "stremio-subs-ro",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Stremio addon for subs.ro subtitles",
   "main": "server.js",
   "scripts": {

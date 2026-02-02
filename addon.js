@@ -200,7 +200,18 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
           const encodedSrtPath = Buffer.from(srtPath).toString("base64url");
 
           // Calculate weighted match score (release group +50, source +20, base fuzzy)
-          const matchScore = calculateMatchScore(videoFilename, srtPath);
+          let matchScore = calculateMatchScore(videoFilename, srtPath);
+
+          // RETAIL BONUS (KISS Approach): +5 points
+          // Acts as tie-breaker for identical matches, but won't override Group/Source matches
+          const isRetail =
+            (sub.translator &&
+              sub.translator.toLowerCase().includes("retail")) ||
+            (sub.title && sub.title.toLowerCase().includes("retail"));
+
+          if (isRetail) {
+            matchScore += 5;
+          }
 
           allSubtitles.push({
             id: `subsro_${sub.id}_${encodedSrtPath.slice(0, 8)}`,
@@ -208,6 +219,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
             lang,
             srtPath,
             matchScore,
+            isRetail, // Passed for debugging/logging
           });
         }
       }
