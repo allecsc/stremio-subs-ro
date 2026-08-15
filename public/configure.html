@@ -558,7 +558,9 @@
           validateBtn: "Verifică",
           btnChecking: "...",
           btnValid: "Valid! ✓",
-          btnInvalid: "Invalid ✕",
+          btnInvalid: "Cheie Invalidă ✕",
+          btnQuotaExceeded: "Cotă Depășită ✕",
+          btnNetworkError: "Eroare Conexiune ✕",
           supportMsg: "Îți place addon-ul? Susține proiectul.",
           donateBtn: "Susține pe Revolut",
           switchLang: "EN",
@@ -579,12 +581,14 @@
           validateBtn: "Validate",
           btnChecking: "...",
           btnValid: "Valid! ✓",
-          btnInvalid: "Invalid ✕",
+          btnInvalid: "Invalid Key ✕",
+          btnQuotaExceeded: "Quota Exceeded ✕",
+          btnNetworkError: "Connection Error ✕",
           supportMsg: "Enjoying the addon? Support the project.",
           donateBtn: "Support on Revolut",
           switchLang: "RO",
           footer: "Developed by",
-          powered: "Provided by",
+          powered: "Powered by",
           manualLinkText: "If automatic opening fails, copy this link into Stremio:",
           copyBtn: "Copy Link",
           other: "Other",
@@ -714,23 +718,29 @@
             isValidated = true;
             document.getElementById('installBtn').disabled = false;
           } else {
-            btn.innerText = t.btnInvalid;
+            let errorText = t.btnInvalid;
+            if (data.reason === 'quota_exceeded') {
+              errorText = t.btnQuotaExceeded || "Quota Exceeded ✕";
+            } else if (data.reason === 'network_error') {
+              errorText = t.btnNetworkError || "Connection Error ✕";
+            }
+            btn.innerText = errorText;
             btn.className = "action-btn validate-btn state-invalid";
             btn.disabled = false;
             
             isValidated = false;
             document.getElementById('installBtn').disabled = true;
             
-            // Revert to "Validate" after 2s so user can try again easily visually
+            // Revert to "Validate" after 2.5s so user can try again easily visually
             setTimeout(() => {
                 if (!isValidated) {
                     btn.innerText = t.validateBtn;
                     btn.className = "action-btn validate-btn";
                 }
-            }, 2000);
+            }, 2500);
           }
         } catch (e) {
-          btn.innerText = t.btnInvalid;
+          btn.innerText = t.btnNetworkError || t.btnInvalid;
           btn.className = "action-btn validate-btn state-invalid";
           btn.disabled = false;
         }

@@ -37,6 +37,18 @@ const decodeConfig = (configStr) => {
   }
 };
 
+// Request logger middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const ts = new Date().toISOString().slice(11, 23);
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    const sanitizedUrl = req.originalUrl.replace(/\/api\/validate\/[^/?]+/, "/api/validate/***");
+    console.log(`[${ts}] ${req.method} ${sanitizedUrl} -> ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
+
 // Serve configure page directly (no redirect - required by addon catalog)
 app.get("/", (req, res) =>
   res.sendFile(path.join(__dirname, "public", "configure.html")),
@@ -54,7 +66,6 @@ const manifestHandler = (req, res) => {
   const userConfig = decodeConfig(config);
   const hasConfig = config && Object.keys(userConfig).length > 0;
 
-  // Shallow clone with spread (40× faster than JSON.parse/stringify)
   const manifest = {
     ...addonInterface.manifest,
     behaviorHints: {
@@ -77,8 +88,14 @@ app.get("/:config/manifest.json", manifestHandler);
 app.get("/api/validate/:apiKey", async (req, res) => {
   const { apiKey } = req.params;
   const client = new SubsRoClient(apiKey);
-  const isValid = await client.validate();
-  res.json({ valid: isValid });
+  const result = await client.validate();
+  const ts = new Date().toISOString().slice(11, 23);
+  if (result.valid) {
+    console.log(`[${ts}] [AUTH] Key validated successfully (Quota: ${result.quota.remaining_quota}/${result.quota.total_quota})`);
+  } else {
+    console.log(`[${ts}] [AUTH] Key validation failed (Status: ${result.status}, Reason: ${result.reason})`);
+  }
+  res.json(result);
 });
 
 // Subtitles

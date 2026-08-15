@@ -2,12 +2,10 @@ const { addonBuilder } = require("stremio-addon-sdk");
 const SubsRoClient = require("./lib/subsro");
 const { matchesEpisode, calculateMatchScore } = require("./lib/matcher");
 const { listSrtFiles, getArchiveType } = require("./lib/archiveUtils");
-const { getLimiter } = require("./lib/rateLimiter");
 const manifest = require("./manifest");
 
 const builder = new addonBuilder(manifest);
 
-// --- CACHE SYSTEM ---
 // --- CACHE SYSTEM ---
 const { ARCHIVE_CACHE, ARCHIVE_CACHE_TTL } = require("./lib/archiveCache");
 
@@ -99,13 +97,8 @@ async function getArchiveSrtList(apiKey, subId) {
   }
 
   try {
-    const downloadUrl = `https://subs.ro/api/v1.0/subtitle/${subId}/download`;
-
-    // Use per-user rate limiter for safe, queued downloads
-    const limiter = getLimiter(apiKey);
-    const buffer = await limiter.downloadArchive(downloadUrl, {
-      headers: { "X-Subs-Api-Key": apiKey },
-    });
+    const client = getClient(apiKey);
+    const buffer = await client.downloadArchive(subId);
 
     const srtFiles = await listSrtFiles(buffer);
     const archiveType = getArchiveType(buffer);
@@ -117,19 +110,12 @@ async function getArchiveSrtList(apiKey, subId) {
       timestamp: Date.now(),
     });
 
-    const status = limiter.getQueueStatus();
     const ts = new Date().toISOString().slice(11, 23);
-
-    // Only log in development to prevent disk fill
-    if (process.env.NODE_ENV === "development") {
-      console.log(
-        `[${ts}] [SUBS] Archive ${subId}: ${
-          srtFiles.length
-        } SRTs (${archiveType.toUpperCase()}) [Active: ${
-          status.activeDownloads
-        }, Pending: ${status.download}]`,
-      );
-    }
+    console.log(
+      `[${ts}] [SUBS] Archive ${subId}: ${
+        srtFiles.length
+      } SRTs (${archiveType.toUpperCase()})`
+    );
 
     return srtFiles;
   } catch (error) {
@@ -140,8 +126,6 @@ async function getArchiveSrtList(apiKey, subId) {
 
 const subtitlesHandler = async ({ type, id, extra, config }) => {
   if (!config || !config.apiKey) return { subtitles: [] };
-
-  // NOTE: Removed globalLimiter.clearQueues() - it was causing users to cancel each other's downloads
 
   const { imdbId, season, episode } = parseStremioId(id);
   const isSeries = type === "series" && episode !== null;
