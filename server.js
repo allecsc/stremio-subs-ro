@@ -8,6 +8,7 @@ const helmet = require("helmet");
 const { addonInterface, subtitlesHandler } = require("./addon");
 const SubsRoClient = require("./lib/subsro");
 const proxyRouter = require("./lib/proxy");
+const adminRouter = require("./lib/adminStats");
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use(
 app.use(cors());
 app.use(express.static(path.join(__dirname, "public")));
 app.use(proxyRouter);
+app.use(adminRouter);
 
 const decodeConfig = (configStr) => {
   if (!configStr) return {};
