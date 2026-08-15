@@ -1,15 +1,19 @@
 const { addonBuilder } = require("stremio-addon-sdk");
 const SubsRoClient = require("./lib/subsro");
-const { matchesEpisode, calculateMatchScore } = require("./lib/matcher");
+const {
+  parseStremioId,
+  matchesEpisode,
+  calculateMatchScore,
+} = require("./lib/matcher");
 const { listSrtFiles, getArchiveType } = require("./lib/archiveUtils");
 const manifest = require("./manifest");
 
 const builder = new addonBuilder(manifest);
 
 // --- CACHE SYSTEM ---
-const { ARCHIVE_CACHE, ARCHIVE_CACHE_TTL } = require("./lib/archiveCache");
+const { ARCHIVE_CACHE } = require("./lib/archiveCache");
 
-// Simple LRU implementation to prevent memory leaks
+// Simple LRU implementation for API clients
 class SimpleLRU {
   constructor(maxSize, ttl = 0) {
     this.maxSize = maxSize;
@@ -36,7 +40,7 @@ class SimpleLRU {
     if (this.cache.has(key)) {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
-      // Evict oldest (first item in Map iteration order)
+      // Evict oldest
       const oldestKey = this.cache.keys().next().value;
       this.cache.delete(oldestKey);
     }
@@ -48,11 +52,8 @@ class SimpleLRU {
   }
 }
 
-const CACHE = new SimpleLRU(1000); // Max 1000 subtitle responses
-const PENDING_REQUESTS = new Map(); // Pending requests are transient, no LRU needed
+const PENDING_REQUESTS = new Map(); // Transient in-flight request debouncing
 const CLIENT_CACHE = new SimpleLRU(500); // Max 500 active API clients
-const CACHE_TTL = 15 * 60 * 1000;
-const EMPTY_CACHE_TTL = 60 * 1000;
 
 const getClient = (apiKey) => {
   let client = CLIENT_CACHE.get(apiKey);
@@ -76,13 +77,30 @@ const LANGUAGE_MAPPING = {
   alt: "und",
 };
 
-function parseStremioId(id) {
-  const parts = id.split(":");
-  return {
-    imdbId: parts[0],
-    season: parts[1] ? parseInt(parts[1], 10) : null,
-    episode: parts[2] ? parseInt(parts[2], 10) : null,
-  };
+/**
+ * Concurrency helper: processes items in parallel with a bounded concurrency cap.
+ */
+async function mapConcurrent(items, limit, fn) {
+  const results = [];
+  const executing = [];
+
+  for (const item of items) {
+    const p = Promise.resolve().then(() => fn(item));
+    results.push(p);
+
+    if (limit <= items.length) {
+      const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+      executing.push(e);
+      if (executing.length >= limit) {
+        await Promise.race(executing);
+      }
+    }
+  }
+
+  const settled = await Promise.allSettled(results);
+  return settled
+    .filter((res) => res.status === "fulfilled" && Array.isArray(res.value))
+    .flatMap((res) => res.value);
 }
 
 /**
@@ -127,29 +145,36 @@ async function getArchiveSrtList(apiKey, subId) {
 const subtitlesHandler = async ({ type, id, extra, config }) => {
   if (!config || !config.apiKey) return { subtitles: [] };
 
-  const { imdbId, season, episode } = parseStremioId(id);
-  const isSeries = type === "series" && episode !== null;
-  const videoFilename = extra?.filename || "";
-
-  const cacheKey = isSeries
-    ? `${imdbId}_s${season}e${episode}_${config.languages || "all"}`
-    : `${imdbId}_${config.languages || "all"}`;
-
-  // 1. Check Cache
-  const cachedData = CACHE.get(cacheKey);
-  if (cachedData && Date.now() - cachedData.timestamp < cachedData.ttl) {
-    return { subtitles: cachedData.data };
+  const parsed = parseStremioId(id);
+  if (!parsed.isValid) {
+    // Fast-fail on unsupported streams (e.g. IPTV) without hitting Subs.ro
+    return { subtitles: [] };
   }
 
-  // 2. Debounce Pending Requests
-  if (PENDING_REQUESTS.has(cacheKey)) {
-    return PENDING_REQUESTS.get(cacheKey);
+  const isSeries = type === "series" && parsed.episode !== null;
+  const videoFilename = extra?.filename || "";
+  const primaryLanguage =
+    config.languages && config.languages.length > 0 ? config.languages[0] : null;
+
+  // Transient in-flight debounce key (prevents identical concurrent requests)
+  const debounceKey = `${config.apiKey}_${parsed.type}_${parsed.id}_${
+    isSeries ? `s${parsed.season}e${parsed.episode}` : "movie"
+  }_${videoFilename}_${config.languages || "all"}`;
+
+  if (PENDING_REQUESTS.has(debounceKey)) {
+    return PENDING_REQUESTS.get(debounceKey);
   }
 
   const fetchTask = (async () => {
     try {
       const subsRo = getClient(config.apiKey);
-      const results = await subsRo.searchByImdb(imdbId);
+      let results = [];
+
+      if (parsed.type === "imdb") {
+        results = await subsRo.searchByImdb(parsed.id, primaryLanguage);
+      } else if (parsed.type === "tmdb") {
+        results = await subsRo.searchByTmdb(parsed.id, primaryLanguage);
+      }
 
       // Filter by language
       let filteredResults = results;
@@ -166,28 +191,29 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         ? BEAMUP_URL
         : config.baseUrl || "http://localhost:7000";
 
-      const allSubtitles = [];
-
-      // Process archives sequentially (rate limiter handles timing)
-      for (const sub of filteredResults) {
+      // Process up to 4 archives concurrently in parallel
+      const allSubtitles = await mapConcurrent(filteredResults, 4, async (sub) => {
         const srtFiles = await getArchiveSrtList(config.apiKey, sub.id);
         const lang = LANGUAGE_MAPPING[sub.language] || sub.language;
+        const subTracks = [];
 
         for (const srtPath of srtFiles) {
           // For series: filter out SRTs that don't match the episode
           if (isSeries) {
-            if (!matchesEpisode(srtPath, season, episode)) {
+            if (!matchesEpisode(srtPath, parsed.season, parsed.episode)) {
               continue;
             }
           }
 
+          // Calculate 9-tier match score (-1 if excluded like FORCED or Multi-CD)
+          let matchScore = calculateMatchScore(videoFilename, srtPath);
+          if (matchScore < 0) {
+            continue;
+          }
+
           const encodedSrtPath = Buffer.from(srtPath).toString("base64url");
 
-          // Calculate weighted match score (release group +50, source +20, base fuzzy)
-          let matchScore = calculateMatchScore(videoFilename, srtPath);
-
-          // RETAIL BONUS (KISS Approach): +5 points
-          // Acts as tie-breaker for identical matches, but won't override Group/Source matches
+          // RETAIL BONUS: +5 points for retail/official syncs
           const isRetail =
             (sub.translator &&
               sub.translator.toLowerCase().includes("retail")) ||
@@ -197,65 +223,50 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
             matchScore += 5;
           }
 
-          allSubtitles.push({
+          subTracks.push({
             id: `subsro_${sub.id}_${encodedSrtPath.slice(0, 8)}`,
             url: `${baseUrl}/${config.apiKey}/proxy/${sub.id}/${encodedSrtPath}/sub.vtt`,
             lang,
             srtPath,
             matchScore,
-            isRetail, // Passed for debugging/logging
+            isRetail,
           });
         }
-      }
 
-      // Sort by weighted match score (highest first)
+        return subTracks;
+      });
+
+      // Sort by 9-tier match score (highest first)
       allSubtitles.sort((a, b) => b.matchScore - a.matchScore);
 
-      // Log top matches for debugging (Dev only)
-      if (
-        process.env.NODE_ENV === "development" &&
-        allSubtitles.length > 0 &&
-        videoFilename
-      ) {
-        const top = allSubtitles.slice(0, 5); // Show top 5
-        console.log(`[SUBS] Matching results for "${videoFilename}":`);
-        top.forEach((s, i) => {
+      // Log matched subtitle rankings with scores
+      if (allSubtitles.length > 0) {
+        const ts = new Date().toISOString().slice(11, 23);
+        console.log(
+          `[${ts}] [MATCH] Ordered results for "${videoFilename || "N/A"}" (${allSubtitles.length} tracks):`
+        );
+        allSubtitles.forEach((s, i) => {
           console.log(`  ${i + 1}. [Score: ${s.matchScore}] ${s.srtPath}`);
         });
       }
 
       // Remove internal properties before returning
-      const subtitles = allSubtitles.map(({ id, url, lang }) => ({
-        id,
-        url,
-        lang,
-      }));
-
-      // Store in Cache
-      CACHE.set(cacheKey, {
-        data: subtitles,
-        timestamp: Date.now(),
-        ttl: subtitles.length > 0 ? CACHE_TTL : EMPTY_CACHE_TTL,
-      });
-
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          `[SUBS] Served ${subtitles.length} subs for ${imdbId}${
-            isSeries ? ` S${season}E${episode}` : ""
-          } (Status: OK)`,
-        );
-      }
-
-      return { subtitles };
+      return {
+        subtitles: allSubtitles.map(({ id, url, lang }) => ({
+          id,
+          url,
+          lang,
+        })),
+      };
     } catch (error) {
-      // Errors are already logged by globalLimiter
+      console.error("[SUBS] Error processing request:", error);
       return { subtitles: [] };
     } finally {
-      PENDING_REQUESTS.delete(cacheKey);
+      PENDING_REQUESTS.delete(debounceKey);
     }
   })();
 
-  PENDING_REQUESTS.set(cacheKey, fetchTask);
+  PENDING_REQUESTS.set(debounceKey, fetchTask);
   return fetchTask;
 };
 
