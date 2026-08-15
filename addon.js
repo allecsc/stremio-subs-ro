@@ -10,6 +10,7 @@ const {
   getArchiveType,
 } = require("./lib/subtitleExtractor");
 const manifest = require("./manifest");
+const { globalMetrics } = require("./lib/metrics");
 
 const builder = new addonBuilder(manifest);
 
@@ -169,6 +170,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
     return PENDING_REQUESTS.get(debounceKey);
   }
 
+  const searchStartTime = Date.now();
   const fetchTask = (async () => {
     try {
       const subsRo = getClient(config.apiKey);
@@ -254,6 +256,13 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         });
       }
 
+      const topScore = allSubtitles.length > 0 ? allSubtitles[0].matchScore : null;
+      globalMetrics.recordSearch({
+        apiKey: config.apiKey,
+        durationMs: Date.now() - searchStartTime,
+        topScore,
+      });
+
       // Remove internal properties before returning
       return {
         subtitles: allSubtitles.map(({ id, url, lang }) => ({
@@ -264,6 +273,11 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
       };
     } catch (error) {
       console.error("[SUBS] Error processing request:", error);
+      globalMetrics.recordSearch({
+        apiKey: config.apiKey,
+        durationMs: Date.now() - searchStartTime,
+        upstreamError: error.response?.status || 500,
+      });
       return { subtitles: [] };
     } finally {
       PENDING_REQUESTS.delete(debounceKey);

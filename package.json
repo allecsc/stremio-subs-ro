@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/validate.test.js && node test/gateway.test.js && node test/matcher_and_routing.test.js && node test/parallel_traversal.test.js && node test/diacritics_and_bridge.test.js && node test/proxy_integration.test.js && node test/metrics.test.js"
+    "test": "node test/validate.test.js && node test/gateway.test.js && node test/matcher_and_routing.test.js && node test/parallel_traversal.test.js && node test/diacritics_and_bridge.test.js && node test/proxy_integration.test.js && node test/metrics.test.js && node test/telemetry_hooks.test.js"
   },
   "engines": {
     "node": ">=18.0.0"
