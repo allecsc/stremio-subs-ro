@@ -14,6 +14,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 7000;
 
+app.enable("trust proxy");
+
 app.use(
   helmet({
     contentSecurityPolicy: false, // Disable CSP to allow custom configuration page scripts/styles
@@ -131,16 +133,24 @@ app.get("/:config?/subtitles/:type/:id/:extra?.json", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Addon live on port ${PORT}`);
   console.log(`[INFO] Logs silenced for production.`);
-
-  // Scheduled restart every 24 hours to prevent memory leaks/hangs
-  const RESTART_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
-  setTimeout(() => {
-    console.error("[SYSTEM] Planned 24h restart triggered. Exiting...");
-    process.exit(0);
-  }, RESTART_INTERVAL);
-
-  console.log(`[SYSTEM] Scheduled restart in 24 hours.`);
 });
+
+// Graceful shutdown handling for BeamUp/Dokku container lifecycle
+const shutdown = (signal) => {
+  console.log(`[SYSTEM] Received ${signal}. Shutting down gracefully...`);
+  server.close(() => {
+    console.log("[SYSTEM] HTTP server closed cleanly.");
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error("[SYSTEM] Forcing shutdown after 5s timeout.");
+    process.exit(1);
+  }, 5000).unref();
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
