@@ -5,7 +5,10 @@ const {
   matchesEpisode,
   calculateMatchScore,
 } = require("./lib/matcher");
-const { listSrtFiles, getArchiveType } = require("./lib/archiveUtils");
+const {
+  unpackArchiveToVttMap,
+  getArchiveType,
+} = require("./lib/subtitleExtractor");
 const manifest = require("./manifest");
 
 const builder = new addonBuilder(manifest);
@@ -104,8 +107,8 @@ async function mapConcurrent(items, limit, fn) {
 }
 
 /**
- * Download archive via rate limiter and list SRT files.
- * Uses caching to avoid redundant downloads.
+ * Download archive, unpack into lightweight WebVTT map, and cache for 60s.
+ * Binary buffer is discarded immediately after extraction to keep RAM minimal.
  */
 async function getArchiveSrtList(apiKey, subId) {
   const cacheKey = `archive_${subId}`;
@@ -118,11 +121,12 @@ async function getArchiveSrtList(apiKey, subId) {
     const client = getClient(apiKey);
     const buffer = await client.downloadArchive(subId);
 
-    const srtFiles = await listSrtFiles(buffer);
+    const vttMap = await unpackArchiveToVttMap(buffer);
+    const srtFiles = Array.from(vttMap.keys());
     const archiveType = getArchiveType(buffer);
 
     ARCHIVE_CACHE.set(cacheKey, {
-      buffer,
+      vttMap,
       srtFiles,
       archiveType,
       timestamp: Date.now(),
@@ -132,7 +136,7 @@ async function getArchiveSrtList(apiKey, subId) {
     console.log(
       `[${ts}] [SUBS] Archive ${subId}: ${
         srtFiles.length
-      } SRTs (${archiveType.toUpperCase()})`
+      } SRTs (${archiveType.toUpperCase()}) -> Extracted to VTT`
     );
 
     return srtFiles;
