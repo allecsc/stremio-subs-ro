@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/validate.test.js && node test/gateway.test.js && node test/matcher_and_routing.test.js && node test/parallel_traversal.test.js && node test/diacritics_and_bridge.test.js && node test/proxy_integration.test.js"
   },
   "engines": {
     "node": ">=18.0.0"
