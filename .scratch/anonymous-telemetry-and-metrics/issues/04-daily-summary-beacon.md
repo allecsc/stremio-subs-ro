@@ -4,12 +4,16 @@
 
 **Blocked by:** 02 — Pipeline Hooks & Live Request Instrumentation
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Daily rollover triggers automatically at 00:00 UTC (or configured interval).
-- [ ] Formats a clear, human-readable summary (e.g. *"Subs.ro Addon: 412 active users, 5,830 requests, 94% cache hit rate, 88% exact sync"*).
-- [ ] Dispatches an HTTP POST payload to `process.env.STATS_WEBHOOK_URL` when configured.
-- [ ] Supports Discord webhook format, Telegram bot format, or generic JSON payload.
-- [ ] If `STATS_WEBHOOK_URL` is empty, scheduler runs in silent in-memory mode without errors.
-- [ ] Webhook timeouts and network errors are caught and logged without crashing the process.
-- [ ] Automated tests verify daily rollover triggering, payload formatting, and failure resilience.
+- [x] Daily rollover triggers automatically at 00:00 UTC (or configured interval).
+- [x] Formats a clear, human-readable summary (e.g. *"Subs.ro Addon: 412 active users, 5,830 requests, 94% cache hit rate, 88% exact sync"*).
+- [x] Dispatches an HTTP POST payload to `process.env.STATS_WEBHOOK_URL` when configured.
+- [x] Supports Discord webhook format, Telegram bot format, or generic JSON payload.
+- [x] If `STATS_WEBHOOK_URL` is empty, scheduler runs in silent in-memory mode without errors.
+- [x] Webhook timeouts and network errors are caught and logged without crashing the process.
+- [x] Automated tests verify daily rollover triggering, payload formatting, and failure resilience.
+
+## Answer
+
+Created `lib/beacon.js` and wired `startBeaconScheduler()` to `server.js`. Implemented automatic 00:00 UTC midnight rollover calculation, formatted markdown daily summaries (DAU, requests, cache hit rate, sync accuracy, latencies, archive types), and dispatched async HTTP POST payloads to Discord, Telegram, or generic webhooks with complete exception isolation. Verified with 5 unit tests in `test/beacon.test.js`.

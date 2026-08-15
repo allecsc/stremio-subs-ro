@@ -17,11 +17,11 @@ An in-process, zero-PII operational metrics engine for the Subs.ro Stremio Addon
 
 ## Tickets
 
-- [01 — Core In-Memory Metrics Engine & Anonymized Ingestion](issues/01-core-metrics-engine.md) (Status: `ready-for-agent`)
-- [02 — Pipeline Hooks & Live Request Instrumentation](issues/02-pipeline-hooks-and-instrumentation.md) (Status: `ready-for-agent`, Blocked by: 01)
-- [03 — Protected Admin Dashboard Route (`/admin/stats`)](issues/03-admin-dashboard-route.md) (Status: `ready-for-agent`, Blocked by: 02)
-- [04 — Automated Daily Summary Beacon (Webhook Scheduler)](issues/04-daily-summary-beacon.md) (Status: `ready-for-agent`, Blocked by: 02)
+- [01 — Core In-Memory Metrics Engine & Anonymized Ingestion](issues/01-core-metrics-engine.md) (Status: `resolved`)
+- [02 — Pipeline Hooks & Live Request Instrumentation](issues/02-pipeline-hooks-and-instrumentation.md) (Status: `resolved`, Blocked by: 01)
+- [03 — Protected Admin Dashboard Route (`/admin/stats`)](issues/03-admin-dashboard-route.md) (Status: `resolved`, Blocked by: 02)
+- [04 — Automated Daily Summary Beacon (Webhook Scheduler)](issues/04-daily-summary-beacon.md) (Status: `resolved`, Blocked by: 02)
 
 ## Work Status
 
-Tickets published and ready for implementation.
+All 4 vertical slice tickets implemented and verified with 10 automated test suites passing.

@@ -9,6 +9,7 @@ const { addonInterface, subtitlesHandler } = require("./addon");
 const SubsRoClient = require("./lib/subsro");
 const proxyRouter = require("./lib/proxy");
 const adminRouter = require("./lib/adminStats");
+const { startBeaconScheduler } = require("./lib/beacon");
 
 dotenv.config();
 
@@ -138,6 +139,7 @@ app.get("/:config?/subtitles/:type/:id/:extra?.json", async (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`🚀 Addon live on port ${PORT}`);
   console.log(`[INFO] Logs silenced for production.`);
+  startBeaconScheduler();
 });
 
 // Graceful shutdown handling for BeamUp/Dokku container lifecycle
