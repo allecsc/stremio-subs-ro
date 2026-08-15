@@ -57,12 +57,14 @@ async function runTests() {
     assert(htmlBody.includes("Cache Hit Rate"));
     console.log("✓ Passed: Standalone HTML dashboard rendered with live metrics");
 
-    // Test 5: Disabled when ADMIN_SECRET is not configured
-    console.log("Test 5: Returns 404 when ADMIN_SECRET env var is completely unset");
+    // Test 5: Fallback to DEFAULT_ADMIN_SECRET when ADMIN_SECRET env var is unset
+    console.log("Test 5: Fallback to DEFAULT_ADMIN_SECRET when env var is unset");
     delete process.env.ADMIN_SECRET;
-    const resNoSecret = await fetch(`${baseUrl}/admin/stats?key=anything`);
-    assert.strictEqual(resNoSecret.status, 404);
-    console.log("✓ Passed: Unconfigured ADMIN_SECRET returns 404");
+    const resWrongFallback = await fetch(`${baseUrl}/admin/stats?key=wrong-secret`);
+    assert.strictEqual(resWrongFallback.status, 404);
+    const resDefaultFallback = await fetch(`${baseUrl}/admin/stats?key=subsro-stats-admin`);
+    assert.strictEqual(resDefaultFallback.status, 200);
+    console.log("✓ Passed: Fallback default secret works when env var is unset");
 
   } finally {
     server.close();
