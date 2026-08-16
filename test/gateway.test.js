@@ -39,6 +39,10 @@ function createMockApiServer() {
         res.writeHead(200, { "Content-Type": "application/octet-stream" });
         return res.end(Buffer.from("PK\x03\x04mockzipcontent"));
       }
+      if (subId === "99999") {
+        res.writeHead(200, { "Content-Type": "application/octet-stream" });
+        return res.end(Buffer.alloc(10 * 1024 * 1024 + 1, 0));
+      }
     }
 
     res.writeHead(404);
@@ -87,6 +91,14 @@ async function runTests() {
     assert(Buffer.isBuffer(downloadBuffer), "Expected Buffer instance");
     assert.strictEqual(downloadBuffer.toString("utf8", 0, 4), "PK\x03\x04");
     console.log("✓ Passed: Archive downloaded successfully");
+
+    // Test 4: Large archives are rejected before they can exhaust the addon process
+    console.log("Test 4: Archive download larger than the memory ceiling is rejected");
+    await assert.rejects(
+      () => client.downloadArchive(99999),
+      /maxContentLength|size|large/i,
+    );
+    console.log("✓ Passed: Oversized archive rejected by the download budget");
 
     console.log("\nALL GATEWAY TESTS PASSED ✓");
   } finally {
