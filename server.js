@@ -11,8 +11,14 @@ const proxyRouter = require("./lib/proxy");
 const adminRouter = require("./lib/adminStats");
 const { startBeaconScheduler } = require("./lib/beacon");
 const { startDiscordBot } = require("./lib/discordBot");
+const {
+  setupProcessAlarmHooks,
+  notifyServerOnline,
+  notifyServerShutdown,
+} = require("./lib/alerts");
 
 dotenv.config();
+setupProcessAlarmHooks();
 
 const app = express();
 const PORT = process.env.PORT || 7000;
@@ -142,11 +148,17 @@ const server = app.listen(PORT, () => {
   console.log(`[INFO] Logs silenced for production.`);
   startBeaconScheduler();
   startDiscordBot();
+  if (process.env.NODE_ENV) {
+    notifyServerOnline(PORT).catch(() => {});
+  }
 });
 
 // Graceful shutdown handling for BeamUp/Dokku container lifecycle
-const shutdown = (signal) => {
+const shutdown = async (signal) => {
   console.log(`[SYSTEM] Received ${signal}. Shutting down gracefully...`);
+  try {
+    await notifyServerShutdown(signal);
+  } catch (_) {}
   server.close(() => {
     console.log("[SYSTEM] HTTP server closed cleanly.");
     process.exit(0);

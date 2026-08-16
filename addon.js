@@ -11,6 +11,7 @@ const {
 } = require("./lib/subtitleExtractor");
 const manifest = require("./manifest");
 const { globalMetrics } = require("./lib/metrics");
+const { notifyUpstreamOutage } = require("./lib/alerts");
 
 const builder = new addonBuilder(manifest);
 
@@ -273,11 +274,15 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
       };
     } catch (error) {
       console.error("[SUBS] Error processing request:", error);
+      const status = error.response?.status || 500;
       globalMetrics.recordSearch({
         apiKey: config.apiKey,
         durationMs: Date.now() - searchStartTime,
-        upstreamError: error.response?.status || 500,
+        upstreamError: status,
       });
+      if (status >= 500 || error.code === "ECONNRESET" || error.code === "ETIMEDOUT") {
+        notifyUpstreamOutage(error.code || `HTTP ${status}`, error.message).catch(() => {});
+      }
       return { subtitles: [] };
     } finally {
       PENDING_REQUESTS.delete(debounceKey);
