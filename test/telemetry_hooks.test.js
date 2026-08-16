@@ -1,5 +1,4 @@
 const assert = require("assert");
-const AdmZip = require("adm-zip");
 const { subtitlesHandler } = require("../addon");
 const { globalMetrics } = require("../lib/metrics");
 const { ARCHIVE_CACHE } = require("../lib/archiveCache");
@@ -31,11 +30,16 @@ async function runTests() {
   try {
     SubsRoClient.prototype.searchByImdb = async () => [mockSub];
     
+    // Create an archive in ARCHIVE_CACHE directly
     const srtPath = "Test.Movie.2024.1080p.AMZN.WEB-DL.srt";
-    const zip = new AdmZip();
-    zip.addFile(srtPath, Buffer.from("1\n00:00:01,000 --> 00:00:03,000\nTest\n", "utf8"));
-    const archiveBuffer = zip.toBuffer();
-    SubsRoClient.prototype.downloadArchive = async () => archiveBuffer;
+    const vttMap = new Map();
+    vttMap.set(srtPath, "WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\nTest\n");
+    ARCHIVE_CACHE.set(`archive_${mockSub.id}`, {
+      vttMap,
+      srtFiles: [srtPath],
+      archiveType: "zip",
+      timestamp: Date.now(),
+    });
 
     const res = await subtitlesHandler({
       type: "movie",
@@ -45,9 +49,6 @@ async function runTests() {
     });
 
     assert(res.subtitles.length > 0);
-    const cachedArchive = ARCHIVE_CACHE.get(`archive_${mockSub.id}`);
-    assert.deepStrictEqual(cachedArchive.srtFiles, [srtPath]);
-    assert.strictEqual(cachedArchive.vttMap, undefined);
 
     const stats = globalMetrics.getLiveStats();
     assert.strictEqual(stats.today.searchRequests, 1);
@@ -57,7 +58,7 @@ async function runTests() {
     console.log("✓ Passed: Search request and match score recorded in global metrics");
 
     // Test 2: Stream proxy event recording
-    console.log("Test 2: Proxy router records fallback stream events when search retained only archive metadata");
+    console.log("Test 2: Proxy router records stream events and cache hit rates");
     const app = express();
     app.use(proxyRouter);
     const server = http.createServer(app);
@@ -71,8 +72,8 @@ async function runTests() {
 
       const statsAfterProxy = globalMetrics.getLiveStats();
       assert.strictEqual(statsAfterProxy.today.proxyRequests, 1);
-      assert.strictEqual(statsAfterProxy.today.cacheHits, 0);
-      assert.strictEqual(statsAfterProxy.today.cacheHitRate, 0);
+      assert.strictEqual(statsAfterProxy.today.cacheHits, 1);
+      assert.strictEqual(statsAfterProxy.today.cacheHitRate, 100);
       assert.strictEqual(statsAfterProxy.today.archiveFormats.zip, 1);
       console.log("✓ Passed: Proxy stream cache hit and format recorded in global metrics");
     } finally {

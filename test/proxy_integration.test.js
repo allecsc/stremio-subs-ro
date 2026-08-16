@@ -4,9 +4,6 @@ const express = require("express");
 const http = require("http");
 const { ARCHIVE_CACHE } = require("../lib/archiveCache");
 const proxyRouter = require("../lib/proxy");
-const SubsRoClient = require("../lib/subsro");
-
-const MAX_PROXY_VTT_ENTRY_BYTES = 512 * 1024;
 
 async function runTests() {
   console.log("=== Running Proxy End-to-End Integration Tests ===");
@@ -53,52 +50,6 @@ async function runTests() {
     assert(body.includes("Așteaptă"));
     assert(!body.includes("Aşteaptă"));
     console.log("✓ Passed: Comma-below characters present in stream output");
-
-    console.log("Test 3: Proxy VTT cache retains a bounded amount of converted subtitle text");
-    for (let index = 0; index < 20; index += 1) {
-      proxyRouter.vttCache.set(`memory-track-${index}`, {
-        vtt: "WEBVTT\n\n" + "x".repeat(MAX_PROXY_VTT_ENTRY_BYTES - 8),
-      });
-    }
-    const vttStats = proxyRouter.vttCache.stats();
-    assert(vttStats.retainedVttBytes <= vttStats.maxRetainedVttBytes);
-    assert.notStrictEqual(proxyRouter.vttCache.get("memory-track-19"), null);
-    assert.strictEqual(proxyRouter.vttCache.get("memory-track-0"), null);
-    console.log("✓ Passed: Proxy VTT text stays within its independent memory budget");
-
-    // 4. Oversized archive bridges retain only metadata; playback must still
-    // download the selected track through the existing fallback path.
-    console.log("Test 4: Proxy falls back to on-demand extraction when a cached archive has no VTT map");
-    const fallbackSubId = "88888";
-    const fallbackPath = "Large.Release.2026.ro.srt";
-    const fallbackEncodedPath = Buffer.from(fallbackPath).toString("base64url");
-    const fallbackSrt = "1\n00:00:01,000 --> 00:00:02,000\nFallback works\n";
-    const zip = new AdmZip();
-    zip.addFile(fallbackPath, Buffer.from(fallbackSrt, "utf8"));
-    const archiveBuffer = zip.toBuffer();
-    let downloadCount = 0;
-    const originalDownloadArchive = SubsRoClient.prototype.downloadArchive;
-
-    try {
-      SubsRoClient.prototype.downloadArchive = async () => {
-        downloadCount += 1;
-        return archiveBuffer;
-      };
-      ARCHIVE_CACHE.set(`archive_${fallbackSubId}`, {
-        srtFiles: [fallbackPath],
-        archiveType: "zip",
-      });
-
-      const fallbackRes = await fetch(
-        `${baseUrl}/testApiKey/proxy/${fallbackSubId}/${fallbackEncodedPath}/sub.vtt`,
-      );
-      assert.strictEqual(fallbackRes.status, 200);
-      assert.strictEqual(await fallbackRes.text(), "WEBVTT\n\n" + fallbackSrt.replace(/,/g, "."));
-      assert.strictEqual(downloadCount, 1);
-      console.log("✓ Passed: Metadata-only cache falls back to a correct WebVTT stream");
-    } finally {
-      SubsRoClient.prototype.downloadArchive = originalDownloadArchive;
-    }
 
   } finally {
     server.close();

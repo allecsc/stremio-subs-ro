@@ -6,7 +6,7 @@ const {
   calculateMatchScore,
 } = require("./lib/matcher");
 const {
-  listSrtFiles,
+  unpackArchiveToVttMap,
   getArchiveType,
 } = require("./lib/subtitleExtractor");
 const manifest = require("./manifest");
@@ -109,8 +109,8 @@ async function mapConcurrent(items, limit, fn) {
 }
 
 /**
- * Download an archive, list subtitle paths, and cache only lightweight metadata.
- * The selected track is extracted on demand by the proxy.
+ * Download archive, unpack into lightweight WebVTT map, and cache for 60s.
+ * Binary buffer is discarded immediately after extraction to keep RAM minimal.
  */
 async function getArchiveSrtList(apiKey, subId) {
   const cacheKey = `archive_${subId}`;
@@ -123,10 +123,12 @@ async function getArchiveSrtList(apiKey, subId) {
     const client = getClient(apiKey);
     const buffer = await client.downloadArchive(subId);
 
-    const srtFiles = await listSrtFiles(buffer);
+    const vttMap = await unpackArchiveToVttMap(buffer);
+    const srtFiles = Array.from(vttMap.keys());
     const archiveType = getArchiveType(buffer);
 
     ARCHIVE_CACHE.set(cacheKey, {
+      vttMap,
       srtFiles,
       archiveType,
       timestamp: Date.now(),
@@ -136,7 +138,7 @@ async function getArchiveSrtList(apiKey, subId) {
     console.log(
       `[${ts}] [SUBS] Archive ${subId}: ${
         srtFiles.length
-      } SRTs (${archiveType.toUpperCase()}) -> Listed for on-demand extraction`
+      } SRTs (${archiveType.toUpperCase()}) -> Extracted to VTT`
     );
 
     return srtFiles;
@@ -196,8 +198,8 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         ? BEAMUP_URL
         : config.baseUrl || "http://localhost:7000";
 
-      // Two bounded downloads keep peak archive-buffer memory below the host heap.
-      const allSubtitles = await mapConcurrent(filteredResults, 2, async (sub) => {
+      // Process up to 4 archives concurrently in parallel
+      const allSubtitles = await mapConcurrent(filteredResults, 4, async (sub) => {
         const srtFiles = await getArchiveSrtList(config.apiKey, sub.id);
         const lang = LANGUAGE_MAPPING[sub.language] || sub.language;
         const subTracks = [];
