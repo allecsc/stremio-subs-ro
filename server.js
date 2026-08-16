@@ -10,6 +10,7 @@ const SubsRoClient = require("./lib/subsro");
 const proxyRouter = require("./lib/proxy");
 const adminRouter = require("./lib/adminStats");
 const { startBeaconScheduler } = require("./lib/beacon");
+const { startDiscordBot } = require("./lib/discordBot");
 
 dotenv.config();
 
@@ -140,6 +141,7 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 Addon live on port ${PORT}`);
   console.log(`[INFO] Logs silenced for production.`);
   startBeaconScheduler();
+  startDiscordBot();
 });
 
 // Graceful shutdown handling for BeamUp/Dokku container lifecycle
