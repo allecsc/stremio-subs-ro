@@ -157,6 +157,17 @@ function runTests() {
   assert(sHdtv > sDvd, `HDTV (${sHdtv}) must > DVDRip (${sDvd})`);
   console.log("✓ Passed: Fallback source quality weighting verified");
 
+  // 7. Regex Metacharacters and Query Parameter Sanitization
+  console.log("Test 7: Titles with ? or regex metacharacters and stream query parameters do not throw");
+  assert.doesNotThrow(() => {
+    parseStremioId("tt0898266:1:1?index=0");
+    parseStremioId("tmdb:12345?index=0&source=stremio");
+    calculateMatchScore("Who.Framed.Roger.Rabbit?.1988.1080p.BluRay.mkv?index=0", "Who.Framed.Roger.Rabbit?.1988.1080p.BluRay.srt");
+    calculateMatchScore("What.If...?.S01E01.1080p.DSNP.WEB-DL-GROUP.mkv", "What.If...?.S01E01.1080p.DSNP.WEB-DL-GROUP.srt");
+    calculateMatchScore("Show.Title.[1080p]+(Special)*.mkv", "Show.Title.[1080p]+(Special)*.srt");
+  });
+  console.log("✓ Passed: Regex metacharacters and stream query parameters handled cleanly");
+
   console.log("\nALL MATCHER AND ROUTING TESTS PASSED ✓");
 }
 

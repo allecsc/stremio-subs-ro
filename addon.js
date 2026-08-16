@@ -271,6 +271,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
           url,
           lang,
         })),
+        cacheMaxAge: 3600, // Instruct client to cache subtitle availability for 1 hour
       };
     } catch (error) {
       console.error("[SUBS] Error processing request:", error);
@@ -280,10 +281,16 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         durationMs: Date.now() - searchStartTime,
         upstreamError: status,
       });
+      globalMetrics.recordError({
+        type: status >= 500 ? "UPSTREAM_SERVER_ERROR" : (error.name || "SEARCH_ERROR"),
+        message: error.message || "Unknown error during subtitle discovery",
+        stack: error.stack,
+        context: id,
+      });
       if (status >= 500 || error.code === "ECONNRESET" || error.code === "ETIMEDOUT") {
         notifyUpstreamOutage(error.code || `HTTP ${status}`, error.message).catch(() => {});
       }
-      return { subtitles: [] };
+      return { subtitles: [], cacheMaxAge: 60 };
     } finally {
       PENDING_REQUESTS.delete(debounceKey);
     }

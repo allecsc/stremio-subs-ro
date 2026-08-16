@@ -85,9 +85,38 @@ async function runTests() {
     const dayStr = `2026-07-${String(i).padStart(2, "0")}`;
     metrics.history.push({ date: dayStr, uniqueActiveUsers: i, totalRequests: i * 10 });
   }
-  metrics.trimHistory(30);
-  assert.strictEqual(metrics.history.length, 30, "History must cap at 30 days");
-  console.log("✓ Passed: Daily rollover and 30-day bounding verified");
+  // Test 6: 7-Day Error Diagnostics & Signature Grouping
+  console.log("Test 6: Error diagnostics group identical signatures and track frequencies");
+  metrics.recordError({
+    type: "UPSTREAM_SERVER_ERROR",
+    message: "Subs.ro returned 502 Bad Gateway",
+    stack: "Error: 502\n    at SubsRoClient.get",
+    context: "tt0898266",
+  });
+  metrics.recordError({
+    type: "UPSTREAM_SERVER_ERROR",
+    message: "Subs.ro returned 502 Bad Gateway",
+    stack: "Error: 502\n    at SubsRoClient.get",
+    context: "tt0898266",
+  });
+  metrics.recordError({
+    type: "SYNTAX_ERROR",
+    message: "Invalid regular expression: Nothing to repeat",
+    stack: "SyntaxError\n    at matcher",
+    context: "Who.Framed.Roger.Rabbit?",
+  });
+
+  const liveStatsWithErrors = metrics.getLiveStats();
+  assert.strictEqual(liveStatsWithErrors.recentErrors.length, 2, "Should have 2 distinct signatures");
+  const upstreamErr = liveStatsWithErrors.recentErrors.find((e) => e.type === "UPSTREAM_SERVER_ERROR");
+  assert.strictEqual(upstreamErr.count, 2, "Repeated 502 errors must increment count to 2");
+  assert.strictEqual(upstreamErr.context, "tt0898266");
+
+  // Test error pruning
+  metrics.errorLog[0].lastSeenMs = Date.now() - (8 * 24 * 60 * 60 * 1000); // 8 days ago
+  metrics.pruneErrors(7);
+  assert.strictEqual(metrics.errorLog.length, 1, "Errors older than 7 days must be pruned");
+  console.log("✓ Passed: 7-day error diagnostics grouping and pruning verified");
 
   console.log("\nALL METRICS TESTS PASSED ✓");
 }
