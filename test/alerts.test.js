@@ -31,7 +31,7 @@ async function runTests() {
     console.log("Test 1: Notify server online alert");
     const onlineSent = await notifyServerOnline(7000);
     assert.strictEqual(onlineSent, true);
-    assert(receivedAlert.embeds[0].title.includes("ONLINE"));
+    assert(/Online/i.test(receivedAlert.embeds[0].title));
     console.log("✓ Passed: Server online alert dispatched");
 
     // Test 2: Fatal crash notification with stack trace

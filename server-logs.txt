@@ -1,0 +1,82 @@
+2026-08-15T13:18:14.301114777Z 
+2026-08-15T13:18:14.301308027Z > stremio-subs-ro@1.6.0 start
+2026-08-15T13:18:14.301316902Z > node server.js
+2026-08-15T13:18:14.301321877Z 
+2026-08-15T13:18:15.047225078Z 🚀 Addon live on port 5571
+2026-08-15T13:18:15.047268507Z [INFO] Logs silenced for production.
+2026-08-15T13:18:15.047274809Z [SYSTEM] Scheduled restart in 24 hours.
+2026-08-15T12:56:31.744270590Z 
+2026-08-15T12:56:31.744293315Z > stremio-subs-ro@1.6.0 start
+2026-08-15T12:56:31.744297353Z > node server.js
+2026-08-15T12:56:31.744300546Z 
+2026-08-15T12:56:32.383203195Z 🚀 Addon live on port 5571
+2026-08-15T12:56:32.383221663Z [INFO] Logs silenced for production.
+2026-08-15T12:56:32.383225529Z [SYSTEM] Scheduled restart in 24 hours.
+
+2026-08-15T13:18:14.290022359Z (node:15) ExperimentalWarning: CommonJS module /app/.heroku/node/lib/node_modules/npm/node_modules/debug/src/node.js is loading ES Module /app/.heroku/node/lib/node_modules/npm/node_modules/supports-color/index.js using require().
+2026-08-15T13:18:14.298168234Z Support for loading ES Module in require() is an experimental feature and might change at any time
+2026-08-15T13:18:14.298183054Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-15T13:18:15.029302699Z (node:163) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-08-15T13:18:15.029329792Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-15T13:19:47.303387326Z [13:19:47.302] [10440a4d] [DOWNLOAD] [429 RATE LIMITED] Retry-After: not specified
+2026-08-15T13:19:47.303404804Z [13:19:47.302] [10440a4d] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/74288/download
+2026-08-15T13:19:47.303670012Z [13:19:47.302] [10440a4d] [DOWNLOAD] Body: {"type":"Buffer","data":[60,104,116,109,108,62,13,10,60,104,101,97,100,62,60,116,105,116,108,101,62,52,50,57,32,84,111,111,32,77,97,110,121,32,82,101,113,117,101,115,116,115,60,47,116,105,116,108,101,62,60,47,104,101,97,100,62,13,10,60,98,111,100,121,62,13,10,60,99,101,110,116,101,114,62,60,104,49,62,52,50,57,32,84,111,111,32,77,97,110,121,32,82,101,113,117,101,115,116,115,60,47,104,49,62,60,47,99,101,110,116,101,114,62,13,10,60,104,114,62,60,99,101,110,116,101,114,62,110,103,105,110,120,60,47,99,101,110,116,101,114,62,13,10,60,47,98,111,100,121,62,13,10,60,47,104,116,109,108,62,13,10]}
+2026-08-15T13:19:47.303865621Z [SUBS] Error downloading archive 74288: Request failed with status code 429
+2026-08-15T13:29:00.442530275Z [13:29:00.442] [b32aac73] [SEARCH] [429 RATE LIMITED] Retry-After: not specified
+2026-08-15T13:29:00.442558655Z [13:29:00.442] [b32aac73] [SEARCH] URL: https://api.subs.ro/v1.0//search/imdbid/tt0898266
+2026-08-15T13:29:00.442565392Z [13:29:00.442] [b32aac73] [SEARCH] Body: {"status":429,"meta":{"requestId":"0220c82e3eaa84ecf3434de1aac079335105355f57e965143ee9bc13f948b25e"},"message":"Daily quota exceeded"}
+2026-08-15T13:33:09.011317810Z [13:33:09.010] [e1a8506d] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:33:09.011527528Z [13:33:09.010] [e1a8506d] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/108070/download
+2026-08-15T13:33:09.011533342Z [SUBS] Error downloading archive 108070: maxContentLength size of 10485760 exceeded
+2026-08-15T13:34:51.493123457Z [13:34:51.492] [e1a8506d] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:34:51.493156751Z [13:34:51.492] [e1a8506d] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/108070/download
+2026-08-15T13:34:51.493298841Z [SUBS] Error downloading archive 108070: maxContentLength size of 10485760 exceeded
+2026-08-15T13:35:29.505874617Z [13:35:29.501] [e1a8506d] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:35:29.505916300Z [13:35:29.501] [e1a8506d] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/108070/download
+2026-08-15T13:35:29.505921262Z [SUBS] Error downloading archive 108070: maxContentLength size of 10485760 exceeded
+2026-08-15T13:36:33.387488009Z [13:36:33.384] [e1a8506d] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:36:33.387529633Z [13:36:33.384] [e1a8506d] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/108070/download
+2026-08-15T13:36:33.387535549Z [SUBS] Error downloading archive 108070: maxContentLength size of 10485760 exceeded
+2026-08-15T13:38:02.706596985Z [13:38:02.706] [e1a8506d] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:38:02.706630998Z [13:38:02.706] [e1a8506d] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/108070/download
+2026-08-15T13:38:02.706660891Z [SUBS] Error downloading archive 108070: maxContentLength size of 10485760 exceeded
+2026-08-15T12:56:31.730693885Z (node:16) ExperimentalWarning: CommonJS module /app/.heroku/node/lib/node_modules/npm/node_modules/debug/src/node.js is loading ES Module /app/.heroku/node/lib/node_modules/npm/node_modules/supports-color/index.js using require().
+2026-08-15T13:40:38.914912701Z [13:40:38.914] [ca641d3c] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T12:56:31.730732957Z Support for loading ES Module in require() is an experimental feature and might change at any time
+2026-08-15T12:56:31.730737475Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-15T13:40:38.914953221Z [13:40:38.914] [ca641d3c] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/107309/download
+2026-08-15T12:56:32.381998710Z (node:164) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-08-15T12:56:32.382018315Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-15T13:40:38.914979873Z [SUBS] Error downloading archive 107309: maxContentLength size of 10485760 exceeded
+2026-08-15T13:42:38.536720462Z [13:42:38.534] [adde1a53] [SEARCH] [ERROR 403] Request failed with status code 403
+2026-08-15T13:42:38.536759501Z [13:42:38.534] [adde1a53] [SEARCH] URL: https://api.subs.ro/v1.0//search/imdbid/tt0295297
+2026-08-15T13:42:38.536763936Z [13:42:38.534] [adde1a53] [SEARCH] Body: {"status":403,"meta":{"requestId":"1b3eceee6930b0eaba2fba01bc14b920b238bd0668a2e364764b985b0d0f2b70"},"message":"Invalid API key"}
+2026-08-15T13:43:30.590854764Z [13:43:30.590] [4490329a] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:43:30.590885656Z [13:43:30.590] [4490329a] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/109238/download
+2026-08-15T13:43:30.590891694Z [SUBS] Error downloading archive 109238: maxContentLength size of 10485760 exceeded
+2026-08-15T12:57:01.376696990Z [12:57:01.376] [ca641d3c] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T12:57:01.376718157Z [12:57:01.376] [ca641d3c] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/107309/download
+2026-08-15T12:57:01.376722182Z [SUBS] Error downloading archive 107309: maxContentLength size of 10485760 exceeded
+2026-08-15T13:00:43.666876810Z [13:00:43.666] [e1a8506d] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:00:43.666902428Z [13:00:43.666] [e1a8506d] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/108070/download
+2026-08-15T13:00:43.668041102Z [SUBS] Error downloading archive 108070: maxContentLength size of 10485760 exceeded
+2026-08-15T13:01:34.829228704Z [13:01:34.827] [76e3aaff] [SEARCH] [ERROR 403] Request failed with status code 403
+2026-08-15T13:01:34.829260053Z [13:01:34.827] [76e3aaff] [SEARCH] URL: https://api.subs.ro/v1.0//search/imdbid/tt5028340
+2026-08-15T13:01:34.829264833Z [13:01:34.827] [76e3aaff] [SEARCH] Body: {"status":403,"meta":{"requestId":"642840425f3ff5a76d378d954b6ec2e91b0ebe54d1f2dbe57de68af5e0805825"},"message":"Invalid API key"}
+2026-08-15T13:05:09.050768399Z [13:05:09.050] [76e3aaff] [SEARCH] [ERROR 403] Request failed with status code 403
+2026-08-15T13:05:09.050788547Z [13:05:09.050] [76e3aaff] [SEARCH] URL: https://api.subs.ro/v1.0//search/imdbid/tt5028340
+2026-08-15T13:05:09.050792203Z [13:05:09.050] [76e3aaff] [SEARCH] Body: {"status":403,"meta":{"requestId":"8d218a4fea8a346bf004eb481981eb03b537b5d8bd4a9f11d9b7de30494de3ef"},"message":"Invalid API key"}
+2026-08-15T13:07:04.653836937Z [13:07:04.653] [b32aac73] [SEARCH] [429 RATE LIMITED] Retry-After: not specified
+2026-08-15T13:07:04.653852802Z [13:07:04.653] [b32aac73] [SEARCH] URL: https://api.subs.ro/v1.0//search/imdbid/tt0898266
+2026-08-15T13:07:04.653856502Z [13:07:04.653] [b32aac73] [SEARCH] Body: {"status":429,"meta":{"requestId":"2766124ac4bb191d73e2206d2871cf4967c198f972f38ba1c5896f8f7ee07f8f"},"message":"Daily quota exceeded"}
+2026-08-15T13:11:53.219758720Z [13:11:53.217] [70c1e3fc] [SEARCH] [ERROR 403] Request failed with status code 403
+2026-08-15T13:11:53.219777821Z [13:11:53.217] [70c1e3fc] [SEARCH] URL: https://api.subs.ro/v1.0//search/imdbid/tt35618070
+2026-08-15T13:11:53.219781925Z [13:11:53.217] [70c1e3fc] [SEARCH] Body: {"status":403,"meta":{"requestId":"6ce42a1bbea06f4d34b818b6cfb42eb29200f7add1acee1d6317490bf698c889"},"message":"Invalid API key"}
+2026-08-15T13:12:38.153799900Z [13:12:38.153] [71f560a7] [SEARCH] [ERROR 400] Request failed with status code 400
+2026-08-15T13:12:38.153821454Z [13:12:38.153] [71f560a7] [SEARCH] URL: https://api.subs.ro/v1.0//search/imdbid/vavoo_EUROSPORT%201%20FHD|group
+2026-08-15T13:12:38.153825669Z [13:12:38.153] [71f560a7] [SEARCH] Body: {"status":400,"meta":{"requestId":"e819471a0e55f06904d88b328cfd7e44c0d55690428e7cf18cf22e1d97c90899"},"message":"Invalid IMDB ID format"}
+2026-08-15T13:27:14.304388709Z [13:27:14.303] [4c75a7b1] [DOWNLOAD] [ERROR ERR_BAD_RESPONSE] maxContentLength size of 10485760 exceeded
+2026-08-15T13:27:14.304405586Z [13:27:14.303] [4c75a7b1] [DOWNLOAD] URL: https://subs.ro/api/v1.0/subtitle/107309/download
+2026-08-15T13:27:14.304409014Z [SUBS] Error downloading archive 107309: maxContentLength size of 10485760 exceeded
+2026-08-15T13:28:24.992011892Z 2026/08/15 13:28:24 signal: terminated
+

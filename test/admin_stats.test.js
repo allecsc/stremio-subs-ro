@@ -41,6 +41,8 @@ async function runTests() {
     assert.strictEqual(resJson.headers.get("content-type"), "application/json; charset=utf-8");
     const jsonData = await resJson.json();
     assert.strictEqual(jsonData.today.uniqueActiveUsers, 1);
+    assert.strictEqual(jsonData.mau30d, 1);
+    assert.strictEqual(jsonData.allTimeInstalls, 1);
     assert.strictEqual(jsonData.today.searchRequests, 1);
     assert.strictEqual(jsonData.today.proxyRequests, 1);
     assert.strictEqual(jsonData.today.cacheHitRate, 100);
@@ -53,8 +55,10 @@ async function runTests() {
     assert(resHtml.headers.get("content-type").includes("text/html"));
     const htmlBody = await resHtml.text();
     assert(htmlBody.includes("Subs.ro Addon — Operational Metrics"));
-    assert(htmlBody.includes("Active Now (15m)"));
-    assert(htmlBody.includes("Cache Hit Rate"));
+    assert(htmlBody.includes("Active (15m)"));
+    assert(htmlBody.includes("30-Day MAU"));
+    assert(htmlBody.includes("All-Time"));
+    assert(htmlBody.includes("7-Day Error Diagnostics"));
     console.log("✓ Passed: Standalone HTML dashboard rendered with live metrics");
 
     // Test 5: Fallback to DEFAULT_ADMIN_SECRET when ADMIN_SECRET env var is unset

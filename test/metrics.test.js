@@ -85,6 +85,9 @@ async function runTests() {
     const dayStr = `2026-07-${String(i).padStart(2, "0")}`;
     metrics.history.push({ date: dayStr, uniqueActiveUsers: i, totalRequests: i * 10 });
   }
+  metrics.trimHistory(30);
+  assert.strictEqual(metrics.history.length, 30, "History must cap at 30 days");
+  console.log("✓ Passed: Daily rollover and 30-day bounding verified");
   // Test 6: 7-Day Error Diagnostics & Signature Grouping
   console.log("Test 6: Error diagnostics group identical signatures and track frequencies");
   metrics.recordError({
@@ -117,6 +120,21 @@ async function runTests() {
   metrics.pruneErrors(7);
   assert.strictEqual(metrics.errorLog.length, 1, "Errors older than 7 days must be pruned");
   console.log("✓ Passed: 7-day error diagnostics grouping and pruning verified");
+
+  // Test 7: Export Snapshot & Persistent Hydration
+  console.log("Test 7: Export snapshot and hydrate into fresh metrics instance");
+  const snapshot = metrics.exportSnapshot();
+  assert.strictEqual(snapshot.version, 1);
+  assert(Array.isArray(snapshot.allTimeHashes));
+  assert(snapshot.allTimeHashes.length >= 2);
+
+  const freshMetrics = new MetricsEngine();
+  const hydrated = freshMetrics.hydrateSnapshot(snapshot);
+  assert.strictEqual(hydrated, true);
+  const freshStats = freshMetrics.getLiveStats();
+  assert.strictEqual(freshStats.allTimeInstalls, snapshot.allTimeHashes.length);
+  assert.strictEqual(freshStats.history.length, snapshot.history.length);
+  console.log("✓ Passed: Metrics export and hydration verified");
 
   console.log("\nALL METRICS TESTS PASSED ✓");
 }
