@@ -1,73 +1,20 @@
 const { addonBuilder } = require("stremio-addon-sdk");
-const SubsRoClient = require("./lib/subsro");
 const {
   parseStremioId,
   matchesEpisode,
+  explicitSeason,
+  hasExplicitEpisode,
   calculateMatchScore,
 } = require("./lib/matcher");
-const {
-  unpackArchiveToVttMap,
-  getArchiveType,
-} = require("./lib/subtitleExtractor");
 const manifest = require("./manifest");
 const { globalMetrics } = require("./lib/metrics");
 const { notifyUpstreamOutage } = require("./lib/alerts");
 
 const builder = new addonBuilder(manifest);
 
-// --- CACHE SYSTEM ---
-const { ARCHIVE_CACHE } = require("./lib/archiveCache");
-
-// Simple LRU implementation for API clients
-class SimpleLRU {
-  constructor(maxSize, ttl = 0) {
-    this.maxSize = maxSize;
-    this.ttl = ttl;
-    this.cache = new Map();
-  }
-
-  get(key) {
-    const item = this.cache.get(key);
-    if (!item) return null;
-
-    if (this.ttl > 0 && Date.now() - item.timestamp > this.ttl) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    // Refresh LRU order
-    this.cache.delete(key);
-    this.cache.set(key, item);
-    return item.value;
-  }
-
-  set(key, value) {
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    } else if (this.cache.size >= this.maxSize) {
-      // Evict oldest
-      const oldestKey = this.cache.keys().next().value;
-      this.cache.delete(oldestKey);
-    }
-    this.cache.set(key, { value, timestamp: Date.now() });
-  }
-
-  has(key) {
-    return this.cache.has(key);
-  }
-}
+const { getSubtitlePipeline } = require("./lib/subtitlePipeline");
 
 const PENDING_REQUESTS = new Map(); // Transient in-flight request debouncing
-const CLIENT_CACHE = new SimpleLRU(500); // Max 500 active API clients
-
-const getClient = (apiKey) => {
-  let client = CLIENT_CACHE.get(apiKey);
-  if (!client) {
-    client = new SubsRoClient(apiKey);
-    CLIENT_CACHE.set(apiKey, client);
-  }
-  return client;
-};
 
 const LANGUAGE_MAPPING = {
   ro: "ron",
@@ -82,70 +29,34 @@ const LANGUAGE_MAPPING = {
   alt: "und",
 };
 
-/**
- * Concurrency helper: processes items in parallel with a bounded concurrency cap.
- */
-async function mapConcurrent(items, limit, fn) {
-  const results = [];
-  const executing = [];
-
-  for (const item of items) {
-    const p = Promise.resolve().then(() => fn(item));
-    results.push(p);
-
-    if (limit <= items.length) {
-      const e = p.then(() => executing.splice(executing.indexOf(e), 1));
-      executing.push(e);
-      if (executing.length >= limit) {
-        await Promise.race(executing);
-      }
-    }
-  }
-
-  const settled = await Promise.allSettled(results);
-  return settled
-    .filter((res) => res.status === "fulfilled" && Array.isArray(res.value))
-    .flatMap((res) => res.value);
+function metadataText(subtitle) {
+  return [subtitle.title, subtitle.release, subtitle.season, subtitle.episode, subtitle.description]
+    .filter((value) => value !== undefined && value !== null)
+    .join(" ");
 }
 
-/**
- * Download archive, unpack into lightweight WebVTT map, and cache for 60s.
- * Binary buffer is discarded immediately after extraction to keep RAM minimal.
- */
-async function getArchiveSrtList(apiKey, subId) {
-  const cacheKey = `archive_${subId}`;
-  const cached = ARCHIVE_CACHE.get(cacheKey);
-  if (cached) {
-    return cached.srtFiles;
-  }
+function numericMetadata(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
 
-  try {
-    const client = getClient(apiKey);
-    const buffer = await client.downloadArchive(subId);
+function packageMetadata(subtitle) {
+  return {
+    text: metadataText(subtitle),
+    season: numericMetadata(subtitle.season),
+    episode: numericMetadata(subtitle.episode),
+  };
+}
 
-    const vttMap = await unpackArchiveToVttMap(buffer);
-    const srtFiles = Array.from(vttMap.keys());
-    const archiveType = getArchiveType(buffer);
+function metadataIdentifiesEpisode(metadata, season, episode) {
+  return (metadata.season === season && metadata.episode === episode) || hasExplicitEpisode(metadata.text, season, episode);
+}
 
-    ARCHIVE_CACHE.set(cacheKey, {
-      vttMap,
-      srtFiles,
-      archiveType,
-      timestamp: Date.now(),
-    });
-
-    const ts = new Date().toISOString().slice(11, 23);
-    console.log(
-      `[${ts}] [SUBS] Archive ${subId}: ${
-        srtFiles.length
-      } SRTs (${archiveType.toUpperCase()}) -> Extracted to VTT`
-    );
-
-    return srtFiles;
-  } catch (error) {
-    console.error(`[SUBS] Error downloading archive ${subId}:`, error.message);
-    return [];
-  }
+function identifiesAnotherSeason(subtitle, requestedSeason) {
+  const numericSeason = Number(subtitle.season);
+  if (Number.isInteger(numericSeason) && numericSeason > 0) return numericSeason !== requestedSeason;
+  const season = explicitSeason(metadataText(subtitle));
+  return season !== null && season !== requestedSeason;
 }
 
 const subtitlesHandler = async ({ type, id, extra, config }) => {
@@ -174,7 +85,8 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
   const searchStartTime = Date.now();
   const fetchTask = (async () => {
     try {
-      const subsRo = getClient(config.apiKey);
+      const pipeline = getSubtitlePipeline();
+      const subsRo = pipeline.getClient(config.apiKey);
       let results = [];
 
       if (parsed.type === "imdb") {
@@ -190,24 +102,34 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
           config.languages.includes(sub.language),
         );
       }
+      if (isSeries) {
+        filteredResults = filteredResults.filter((sub) => !identifiesAnotherSeason(sub, parsed.season));
+      }
 
       // BeamUp URL detection - hardcoded for production, dynamic for local dev
       const BEAMUP_URL =
         "https://cdcd7719a6b3-stremio-subs-ro.baby-beamup.club";
-      const baseUrl = process.env.NODE_ENV
+      const baseUrl = pipeline.options.deliveryBaseUrl || (process.env.NODE_ENV
         ? BEAMUP_URL
-        : config.baseUrl || "http://localhost:7000";
+        : config.baseUrl || "http://localhost:7000");
 
-      // Process up to 4 archives concurrently in parallel
-      const allSubtitles = await mapConcurrent(filteredResults, 4, async (sub) => {
-        const srtFiles = await getArchiveSrtList(config.apiKey, sub.id);
+      // Cold-package scheduling is process-wide inside the shared pipeline.
+      const packageResults = await Promise.allSettled(filteredResults.map(async (sub) => {
+        const packageMetadataForSub = packageMetadata(sub);
+        const tracks = await pipeline.getArchiveTracks(config.apiKey, sub.id, {
+          season: isSeries ? parsed.season : null,
+          episode: isSeries ? parsed.episode : null,
+          metadata: packageMetadataForSub,
+          updatedAt: sub.updatedAt,
+        });
         const lang = LANGUAGE_MAPPING[sub.language] || sub.language;
         const subTracks = [];
 
-        for (const srtPath of srtFiles) {
+        for (const track of tracks) {
+          const srtPath = track.originalPath;
           // For series: filter out SRTs that don't match the episode
           if (isSeries) {
-            if (!matchesEpisode(srtPath, parsed.season, parsed.episode)) {
+            if (!matchesEpisode(srtPath, parsed.season, parsed.episode) && !metadataIdentifiesEpisode(packageMetadataForSub, parsed.season, parsed.episode)) {
               continue;
             }
           }
@@ -218,7 +140,7 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
             continue;
           }
 
-          const encodedSrtPath = Buffer.from(srtPath).toString("base64url");
+          const encodedSrtPath = track.id;
 
           // RETAIL BONUS: +5 points for retail/official syncs
           const isRetail =
@@ -241,7 +163,10 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         }
 
         return subTracks;
-      });
+      }));
+      const allSubtitles = packageResults
+        .filter((result) => result.status === "fulfilled" && Array.isArray(result.value))
+        .flatMap((result) => result.value);
 
       // Sort by 9-tier match score (highest first)
       allSubtitles.sort((a, b) => b.matchScore - a.matchScore);
