@@ -1,15 +1,13 @@
 const assert = require("assert");
 const iconv = require("iconv-lite");
-const AdmZip = require("adm-zip");
 const {
   normalizeRomanianDiacritics,
   srtToVtt,
   decodeSubtitleBuffer,
-  unpackArchiveToVttMap,
 } = require("../lib/subtitleExtractor");
 
 function runTests() {
-  console.log("=== Running Diacritics Normalization & WebVTT Bridge Tests ===");
+  console.log("=== Running Diacritics Normalization & WebVTT Conversion Tests ===");
 
   // 1. Diacritics Normalization
   console.log("Test 1: Normalize legacy Romanian cedillas (ş, ţ) to comma-below (ș, ț)");
@@ -58,22 +56,7 @@ function runTests() {
   assert(vttOutput.includes("Și ce mai faci?"));
   console.log("✓ Passed: SRT converted cleanly to WebVTT");
 
-  // 4. Archive to VTT Map Unpacking
-  console.log("Test 4: Unpack archive directly into pre-converted VTT Map");
-  const zip = new AdmZip();
-  zip.addFile("Movie.Ro.srt", Buffer.from(sampleSrt, "utf-8"));
-  zip.addFile("readme.txt", Buffer.from("Enjoy the movie", "utf-8"));
-  const zipBuffer = zip.toBuffer();
-
-  const vttMap = unpackArchiveToVttMap(zipBuffer);
-  assert(vttMap.has("Movie.Ro.srt"));
-  assert(!vttMap.has("readme.txt"));
-  const extractedVtt = vttMap.get("Movie.Ro.srt");
-  assert(extractedVtt.startsWith("WEBVTT\n\n"));
-  assert(extractedVtt.includes("Așteaptă"));
-  console.log(`✓ Passed: Archive unpacked into ${vttMap.size} WebVTT entries in memory`);
-
-  console.log("\nALL DIACRITICS AND BRIDGE TESTS PASSED ✓");
+  console.log("\nALL DIACRITICS AND WEBVTT CONVERSION TESTS PASSED ✓");
 }
 
 runTests();

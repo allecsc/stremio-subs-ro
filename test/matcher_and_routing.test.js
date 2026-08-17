@@ -7,6 +7,9 @@ const {
   getReleaseGroup,
   calculateMatchScore,
   parseStremioId,
+  matchesEpisode,
+  explicitSeason,
+  hasRecognizableEpisode,
 } = require("../lib/matcher");
 
 function runTests() {
@@ -61,6 +64,15 @@ function runTests() {
   assert.strictEqual(isExcludedSubtitle("Titanic.1997.Part.2.srt"), true);
   assert.strictEqual(isExcludedSubtitle("Movie.2024.1080p.BluRay.x264-FLUX.srt"), false);
   assert.strictEqual(isExcludedSubtitle("Show.S01E03.AMZN.WEB-DL.srt"), false);
+  assert.strictEqual(explicitSeason("Show.S02E03.1080p.srt"), 2);
+  assert.strictEqual(explicitSeason("Show.2x03.1080p.srt"), 2);
+  for (const label of ["season", "sezon", "stagione", "saison", "staffel", "évad", "κύκλος", "temporada"]) {
+    assert.strictEqual(explicitSeason(`Show ${label} 2`), 2);
+  }
+  assert.strictEqual(hasRecognizableEpisode("Show.S01E03.1080p.srt"), true);
+  assert.strictEqual(hasRecognizableEpisode("Show.2x03.1080p.srt"), true);
+  assert.strictEqual(matchesEpisode("Show.02.1080p.srt", 1, 2), true);
+  assert.strictEqual(hasRecognizableEpisode("Show.02.1080p.srt"), true);
   console.log("✓ Passed: Exclusion filtering verified");
 
   // 3. Tag Extractions

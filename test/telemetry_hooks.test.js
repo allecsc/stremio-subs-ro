@@ -1,11 +1,30 @@
 const assert = require("assert");
+const AdmZip = require("adm-zip");
+const fs = require("fs/promises");
+const os = require("os");
+const path = require("path");
 const { subtitlesHandler } = require("../addon");
 const { globalMetrics } = require("../lib/metrics");
-const { ARCHIVE_CACHE } = require("../lib/archiveCache");
 const SubsRoClient = require("../lib/subsro");
+const { configureSubtitlePipeline, resetSubtitlePipeline } = require("../lib/subtitlePipeline");
 const express = require("express");
 const http = require("http");
 const proxyRouter = require("../lib/proxy");
+
+function closeServer(server) {
+  if (!server?.listening) return Promise.resolve();
+  return new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+}
+
+function listen(server) {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+}
 
 async function runTests() {
   console.log("=== Running Telemetry Pipeline Hooks Tests ===");
@@ -25,20 +44,21 @@ async function runTests() {
   };
 
   const originalSearch = SubsRoClient.prototype.searchByImdb;
-  const originalDownload = SubsRoClient.prototype.downloadArchive;
+  const cacheRoot = await fs.mkdtemp(path.join(os.tmpdir(), "subsro-telemetry-test-"));
 
   try {
     SubsRoClient.prototype.searchByImdb = async () => [mockSub];
     
-    // Create an archive in ARCHIVE_CACHE directly
     const srtPath = "Test.Movie.2024.1080p.AMZN.WEB-DL.srt";
-    const vttMap = new Map();
-    vttMap.set(srtPath, "WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\nTest\n");
-    ARCHIVE_CACHE.set(`archive_${mockSub.id}`, {
-      vttMap,
-      srtFiles: [srtPath],
-      archiveType: "zip",
-      timestamp: Date.now(),
+    const zip = new AdmZip();
+    zip.addFile(srtPath, Buffer.from("1\n00:00:01,000 --> 00:00:03,000\nTest\n"));
+    configureSubtitlePipeline({
+      cacheRoot,
+      createClient: (apiKey) => {
+        const client = new SubsRoClient(apiKey);
+        client.downloadArchiveToFile = async (_subId, destination) => fs.writeFile(destination, zip.toBuffer(), { flag: "wx" });
+        return client;
+      },
     });
 
     const res = await subtitlesHandler({
@@ -62,12 +82,11 @@ async function runTests() {
     const app = express();
     app.use(proxyRouter);
     const server = http.createServer(app);
-    await new Promise((resolve) => server.listen(0, resolve));
-    const port = server.address().port;
-
     try {
-      const encodedSrtPath = Buffer.from(srtPath).toString("base64url");
-      const proxyRes = await fetch(`http://localhost:${port}/${testApiKey}/proxy/${mockSub.id}/${encodedSrtPath}/sub.vtt`);
+      await listen(server);
+      const port = server.address().port;
+      const proxyUrl = new URL(res.subtitles[0].url);
+      const proxyRes = await fetch(`http://localhost:${port}${proxyUrl.pathname}`);
       assert.strictEqual(proxyRes.status, 200);
 
       const statsAfterProxy = globalMetrics.getLiveStats();
@@ -77,12 +96,13 @@ async function runTests() {
       assert.strictEqual(statsAfterProxy.today.archiveFormats.zip, 1);
       console.log("✓ Passed: Proxy stream cache hit and format recorded in global metrics");
     } finally {
-      server.close();
+      await closeServer(server);
     }
 
   } finally {
     SubsRoClient.prototype.searchByImdb = originalSearch;
-    SubsRoClient.prototype.downloadArchive = originalDownload;
+    resetSubtitlePipeline();
+    await fs.rm(cacheRoot, { recursive: true, force: true });
   }
 
   console.log("\nALL TELEMETRY HOOKS TESTS PASSED ✓");

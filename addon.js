@@ -171,15 +171,10 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
       // Sort by 9-tier match score (highest first)
       allSubtitles.sort((a, b) => b.matchScore - a.matchScore);
 
-      // Log matched subtitle rankings with scores
+      // Log matched subtitle count without exposing video filename or track paths
       if (allSubtitles.length > 0) {
         const ts = new Date().toISOString().slice(11, 23);
-        console.log(
-          `[${ts}] [MATCH] Ordered results for "${videoFilename || "N/A"}" (${allSubtitles.length} tracks):`
-        );
-        allSubtitles.forEach((s, i) => {
-          console.log(`  ${i + 1}. [Score: ${s.matchScore}] ${s.srtPath}`);
-        });
+        console.log(`[${ts}] [MATCH] Evaluated ${allSubtitles.length} candidate subtitle tracks`);
       }
 
       const topScore = allSubtitles.length > 0 ? allSubtitles[0].matchScore : null;
@@ -199,8 +194,10 @@ const subtitlesHandler = async ({ type, id, extra, config }) => {
         cacheMaxAge: 3600, // Instruct client to cache subtitle availability for 1 hour
       };
     } catch (error) {
-      console.error("[SUBS] Error processing request:", error);
       const status = error.response?.status || 500;
+      const errorClassification = error.code || (error.name && error.name !== "Error" ? error.name : (status >= 500 ? "UPSTREAM_SERVER_ERROR" : "SEARCH_ERROR"));
+      const errorMessage = error.message || "Unknown error during subtitle discovery";
+      console.error(`[SUBS] Error processing request (${errorClassification}): ${errorMessage}`);
       globalMetrics.recordSearch({
         apiKey: config.apiKey,
         durationMs: Date.now() - searchStartTime,
