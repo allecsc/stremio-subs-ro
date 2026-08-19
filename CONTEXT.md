@@ -7,8 +7,32 @@ Domain concepts and terms used across the Subs.ro Stremio Addon.
 ### Subtitle Package (Archive)
 A compressed archive (`.zip` or `.rar`) hosted on Subs.ro containing one or more `.srt` subtitle files, often corresponding to different release groups or entire series seasons.
 
+### Subtitle List Request
+A Stremio discovery request for the available subtitle tracks for one movie or episode. Its response contains track descriptions and delivery URLs, not subtitle content.
+_Avoid_: Player request, package request, search request
+
+### Subtitle Delivery Request
+A Stremio request to fetch the WebVTT content of one track selected from a previous Subtitle List Request.
+_Avoid_: Stream request, playback request, proxy request
+
 ### Subtitle Track
 An individual subtitle file (`.srt` extracted from a Subtitle Package) representing a specific language, season, episode, and release synchronization.
+
+### Usable Subtitle Track
+A Subtitle Track that remains eligible for listing and playback after permanent exclusions are applied. A track for a later episode is still usable, not rejected.
+_Avoid_: Accepted subtitle, non-rejected subtitle
+
+### Prepared Subtitle Track
+A Usable Subtitle Track that has been converted to WebVTT and is ready to stream without further conversion.
+_Avoid_: Converted subtitle, cached VTT
+
+### Cached Package
+A retained representation of one Subtitle Package containing its Usable and Prepared Subtitle Tracks as a single reuse unit. It is identified globally by the Subs.ro package ID, independent of any user or API key.
+_Avoid_: Cache item, archive cache
+
+### Extracted Track Cache
+A disposable collection of Cached Packages retained so later playback can reuse their tracks without fetching and extracting the Subtitle Package again.
+_Avoid_: Archive cache, decompressed subs
 
 ### Movie Edition (Cut)
 The cut or edition variation of the release (e.g. `EXTENDED`, `UNRATED`, `DIRECTORS CUT`, `REMASTERED`, `IMAX`, `THEATRICAL`). A fundamental synchronization factor determining timeline offsets.

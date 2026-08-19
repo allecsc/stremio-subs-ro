@@ -121,6 +121,35 @@ does not describe runtime behaviour.
 - Whether temporary container disk is shared or survives BeamUp replacement;
   official BeamUp source does not establish that for this deployment.
 
+## Follow-up: agreed extracted-SRT workflow
+
+On 2026-08-17, the same 12 saved archives were measured again using the
+subsequently agreed workflow: extract every SRT without converting it, write
+the extracted tracks to a temporary package directory, and atomically rename
+that directory into place.
+
+| Measurement | Result |
+| --- | ---: |
+| Average median raw extraction, all SRTs | 6.3 ms/package |
+| Total median raw extraction, 12 packages | 76.1 ms |
+| Average median extract + write + promote | 14.1 ms/package |
+| Total median extract + write + promote, 12 packages | 169.2 ms |
+| Projected local preparation for 300 packages | 4.23 seconds |
+
+The 300-package figure excludes Subs.ro search and download time and is not a
+production latency guarantee. It shows that the earlier 46-second estimate
+does not describe the agreed no-conversion workflow.
+
+Both active archive libraries perform their extraction work synchronously on
+Node's main JavaScript thread. Promise-style parallel extraction therefore
+does not provide true multicore decompression in the current implementation.
+A shared extraction gate can bound bursts and yield between packages without
+materially increasing the measured amount of preparation work.
+
+This follow-up supersedes the earlier suggestion in this note to retain
+compressed archives. The accepted design retains extracted SRT tracks on disk
+and discards each archive after package preparation.
+
 ## Reproduction
 
 The benchmark harness is `.scratch/benchmark-archive-workflow.js`.

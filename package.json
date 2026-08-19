@@ -1,15 +1,11 @@
 {
   "name": "stremio-subs-ro",
-  "version": "2.0.0",
+  "version": "2.1.0-rc.1",
   "description": "Stremio addon for subs.ro subtitles",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/validate.test.js && node test/gateway.test.js && node test/matcher_and_routing.test.js && node test/subtitle_conversion.test.js && node test/proxy_integration.test.js && node test/end_to_end_pipeline_seam.test.js && node test/process_wide_scheduling.test.js && node test/lru_and_disk_safety.test.js && node test/delivery_recovery_and_revisions.test.js && node test/pipeline_operational_signals.test.js && node test/metrics.test.js && node test/telemetry_hooks.test.js && node test/admin_stats.test.js && node test/beacon.test.js && node test/alerts.test.js",
-    "test:i05": "node test/process_wide_scheduling.test.js",
-    "test:i06": "node test/lru_and_disk_safety.test.js",
-    "test:i07": "node test/delivery_recovery_and_revisions.test.js",
-    "smoke:local": "node test/local_http_smoke.js"
+    "test": "node test/test_production_rc_validation.js && node test/test_final_deployment_validation.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -31,7 +27,6 @@
     "adm-zip": "^0.5.10",
     "axios": "^1.6.0",
     "cors": "^2.8.5",
-    "discord.js": "^14.27.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "fuzzball": "^2.2.3",

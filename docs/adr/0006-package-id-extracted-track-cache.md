@@ -1,0 +1,21 @@
+# Package-ID Extracted-Track Cache
+
+**Status:** Accepted
+
+Every Subtitle Package is identified globally by its Subs.ro package ID and checked in a process-local index before any archive download. A ready package supplies its extracted tracks, a pending package shares the same preparation, and only an absent package may start a download. No download path bypasses this lookup. Preparation filters permanent exclusions, writes all remaining usable SRT tracks into a temporary package directory, atomically promotes the complete package to ready, and discards the compressed archive. Corrupt individual tracks are omitted; if the package cannot become usable, its temporary files and pending state are removed. The current Subtitle List Request then selects and dynamically ranks only its relevant tracks.
+
+A Subtitle Delivery Request converts only its selected SRT and atomically replaces that track with the Prepared Subtitle Track. Conversion failure preserves the SRT and produces a controlled request error. A delivery request whose package is absent rebuilds the complete package instead of extracting only one track.
+
+The complete Cached Package is the reuse and eviction unit. Any successful list or delivery access refreshes the whole package, and eviction removes it as a whole. The cache contains no API key or user identity and is disposable after process restart.
+
+The package index records Subs.ro's `updatedAt` value when available. A later value invalidates the cached revision; without that value, the package ID remains authoritative. A successfully prepared package with no usable tracks is retained as an empty result so it is not downloaded repeatedly, while download and extraction failures remain retryable.
+
+For a series track whose filename does not identify an episode, explicit package metadata for the requested episode may supply the missing identity; otherwise the track is discarded because it cannot be routed safely. After a rebuild, an older delivery URL is honored only when its exact track still exists and otherwise receives a controlled not-found response. Missing or corrupt cache files invalidate the whole package and trigger one complete rebuild; a failed rebuild returns a controlled error without publishing partial state or crashing the addon.
+
+Only cold packages enter shared scheduling; searches, cache hits, and unrelated requests are not serialized. Archive downloads stream to temporary disk through a process-wide limit of eight. Completed downloads enter one process-wide FIFO extraction gate because both active archive libraries perform extraction synchronously on Node's main JavaScript thread. Each extraction job publishes or rejects one complete package, deletes its archive, and yields before the next job. Accepted preparation continues after the originating client disconnects so useful work is not discarded.
+
+SRT-to-WebVTT conversion has no global queue. Simultaneous delivery requests for the same track share one conversion, while different tracks remain independent. The converted track atomically replaces its SRT.
+
+Cached Packages have a 24-hour sliding lifetime. App-managed disk has a 1 GiB hard limit covering ready packages, downloaded archives, and incomplete package directories together. As usage approaches that limit, ready packages are trimmed to 512 MiB before more work is accepted; cleanup begins earlier whenever the filesystem has less than 25% free space. Capacity is measured from actual stored bytes, never entry counts or estimates. Expired packages are removed before least-recently-used packages, and packages currently being read or converted are not eligible for eviction. A package that still cannot fit is omitted with complete temporary-file cleanup and a controlled warning; other packages remain available.
+
+Before extraction, package headers are inspected and the package is rejected if its usable subtitle content declares more than 256 MiB or more than 1,000 tracks. The cache and download staging areas use dedicated directories that are cleared on process startup. Downloaded archives are deleted after preparation, failed temporary packages are always removed, and cleanup never targets paths outside those dedicated roots.

@@ -3,19 +3,28 @@ const cors = require("cors");
 const path = require("path");
 const querystring = require("querystring");
 const dotenv = require("dotenv");
+const fs = require("fs");
 
 const helmet = require("helmet");
-const { addonInterface, subtitlesHandler } = require("./addon");
+const {
+  addonInterface,
+  subtitlesHandler,
+  PENDING_PACKAGES,
+  PENDING_REQUESTS,
+} = require("./addon");
 const SubsRoClient = require("./lib/subsro");
 const proxyRouter = require("./lib/proxy");
 const adminRouter = require("./lib/adminStats");
-const { startBeaconScheduler } = require("./lib/beacon");
-const { startDiscordBot } = require("./lib/discordBot");
+const { ARCHIVE_CACHE, STAGING_DIR } = require("./lib/archiveCache");
+const { limiterManager } = require("./lib/rateLimiter");
+const { globalMetrics, APP_VERSION } = require("./lib/metrics");
+const { startTelemetryScheduler } = require("./lib/beacon");
 const {
   setupProcessAlarmHooks,
   notifyServerOnline,
-  notifyServerShutdown,
 } = require("./lib/alerts");
+
+dotenv.config();
 
 const decodeConfig = (configStr) => {
   if (!configStr) return {};
@@ -33,13 +42,32 @@ const decodeConfig = (configStr) => {
 function categorizeRoute(urlPath) {
   if (!urlPath || typeof urlPath !== "string") return "/other";
   const normalized = urlPath.split("?")[0].replace(/\/+/g, "/");
-  if (normalized === "/" || normalized === "/configure" || normalized.endsWith("/configure")) return "/configure";
-  if (normalized === "/manifest" || normalized === "/manifest.json" || normalized.endsWith("/manifest") || normalized.endsWith("/manifest.json")) return "/manifest";
+  if (
+    normalized === "/" ||
+    normalized === "/configure" ||
+    normalized.endsWith("/configure")
+  )
+    return "/configure";
+  if (
+    normalized === "/manifest" ||
+    normalized === "/manifest.json" ||
+    normalized.endsWith("/manifest") ||
+    normalized.endsWith("/manifest.json")
+  )
+    return "/manifest";
   if (normalized.includes("/subtitles/")) return "/subtitles";
   if (normalized.includes("/proxy/")) return "/proxy";
   if (normalized.startsWith("/api/validate")) return "/validate";
   if (normalized.startsWith("/admin")) return "/admin";
-  if (normalized.startsWith("/public") || normalized.endsWith(".html") || normalized.endsWith(".css") || normalized.endsWith(".js") || normalized.endsWith(".png") || normalized.endsWith(".ico")) return "/static";
+  if (
+    normalized.startsWith("/public") ||
+    normalized.endsWith(".html") ||
+    normalized.endsWith(".css") ||
+    normalized.endsWith(".js") ||
+    normalized.endsWith(".png") ||
+    normalized.endsWith(".ico")
+  )
+    return "/static";
   return "/other";
 }
 
@@ -81,7 +109,9 @@ function createApp() {
     res.on("finish", () => {
       const duration = Date.now() - start;
       const category = categorizeRoute(req.originalUrl || req.url || req.path);
-      console.log(`[${ts}] ${req.method} ${category} -> ${res.statusCode} (${duration}ms)`);
+      console.log(
+        `[${ts}] ${req.method} ${category} -> ${res.statusCode} (${duration}ms)`,
+      );
     });
     next();
   });
@@ -113,9 +143,13 @@ function createApp() {
     const result = await client.validate();
     const ts = new Date().toISOString().slice(11, 23);
     if (result.valid) {
-      console.log(`[${ts}] [AUTH] Key validated successfully (Quota: ${result.quota.remaining_quota}/${result.quota.total_quota})`);
+      console.log(
+        `[${ts}] [AUTH] Key validated successfully (Quota: ${result.quota?.remaining_quota}/${result.quota?.total_quota})`,
+      );
     } else {
-      console.log(`[${ts}] [AUTH] Key validation failed (Status: ${result.status}, Reason: ${result.reason})`);
+      console.log(
+        `[${ts}] [AUTH] Key validation failed (Status: ${result.status}, Reason: ${result.reason})`,
+      );
     }
     res.json(result);
   });
@@ -156,39 +190,71 @@ function createApp() {
   return app;
 }
 
+function startResourceSampler() {
+  const sampleInterval = 60 * 1000; // 60 seconds
+
+  const doSample = () => {
+    const startLag = Date.now();
+    setTimeout(() => {
+      const eventLoopLagMs = Math.max(0, Date.now() - startLag);
+
+      let stagedFileCount = 0;
+      let stagedTotalBytes = 0;
+      try {
+        if (fs.existsSync(STAGING_DIR)) {
+          const files = fs.readdirSync(STAGING_DIR);
+          stagedFileCount = files.length;
+          for (const file of files) {
+            try {
+              const stat = fs.statSync(path.join(STAGING_DIR, file));
+              stagedTotalBytes += stat.size;
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
+      let queuedDownloads = 0;
+      let activeLimiters = 0;
+      try {
+        activeLimiters = limiterManager.limiters.size;
+        for (const limiter of limiterManager.limiters.values()) {
+          queuedDownloads += limiter.queues?.download?.queue?.length || 0;
+        }
+      } catch (e) {}
+
+      globalMetrics.sampleResources({
+        archiveCacheEntries: ARCHIVE_CACHE.size || 0,
+        stagedFileCount,
+        stagedTotalBytes,
+        pendingPackages: PENDING_PACKAGES.size || 0,
+        pendingRequests: PENDING_REQUESTS.size || 0,
+        activeLimiters,
+        globalActiveDownloads: limiterManager.globalActiveDownloads || 0,
+        queuedDownloads,
+        eventLoopLagMs,
+      });
+    }, 0);
+  };
+
+  const timerId = setInterval(doSample, sampleInterval);
+  doSample(); // Initial sample on boot
+  return timerId;
+}
+
 function startServer(port = process.env.PORT || 7000) {
   dotenv.config();
   setupProcessAlarmHooks();
 
   const app = createApp();
   const server = app.listen(port, () => {
-    console.log(`🚀 Addon live on port ${port}`);
+    console.log(`🚀 Subs.ro Addon v${APP_VERSION} live on port ${port}`);
     console.log(`[INFO] Logs silenced for production.`);
-    startBeaconScheduler();
-    startDiscordBot();
+    startTelemetryScheduler();
+    startResourceSampler();
     if (process.env.NODE_ENV) {
       notifyServerOnline(port).catch(() => {});
     }
   });
-
-  // Graceful shutdown handling for BeamUp/Dokku container lifecycle
-  const shutdown = async (signal) => {
-    console.log(`[SYSTEM] Received ${signal}. Shutting down gracefully...`);
-    try {
-      await notifyServerShutdown(signal);
-    } catch (_) {}
-    server.close(() => {
-      console.log("[SYSTEM] HTTP server closed cleanly.");
-      process.exit(0);
-    });
-    setTimeout(() => {
-      console.error("[SYSTEM] Forcing shutdown after 5s timeout.");
-      process.exit(1);
-    }, 5000).unref();
-  };
-
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
 
   return { app, server };
 }

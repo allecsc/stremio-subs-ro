@@ -1,6 +1,6 @@
 const manifest = {
   id: "org.stremio.subsro",
-  version: "2.0.0",
+  version: "2.1.0-rc.1",
   name: "Subs.ro Subtitles",
   description: "Romanian subtitles from Subs.ro (unofficial)",
   logo: "https://raw.githubusercontent.com/allecsc/stremio-subs-ro/refs/heads/master/public/logo.png",
@@ -9,7 +9,7 @@ const manifest = {
     {
       name: "subtitles",
       types: ["movie", "series"],
-      idPrefixes: ["tt", "tmdb:"],
+      idPrefixes: ["tt"],
     },
   ],
   types: ["subtitles"],
